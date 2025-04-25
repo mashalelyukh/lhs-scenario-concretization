@@ -3,12 +3,14 @@ scenario bar:
     aspeed: speed
     afloat: float
     gear: uint
+    weatherCondition: string
     keep(afloat in [10..20])
     keep(gear in [-1..6])
 
 scenario foo:
     car: vehicle
     do parallel(duration: [10s..20s]):
+        weatherCondition : ["sunny", "rainy", "foggy"]
         car.drive() with:
             speed([80kph..120kph])
         bar(aspeed: [20kph..40kph])

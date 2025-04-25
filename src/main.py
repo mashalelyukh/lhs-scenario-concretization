@@ -23,7 +23,7 @@ def main():
         print(f"  {enum_name}: {values}")
 
     num_samples = 10
-    concrete_samples = generate_concrete_parameter_samples(num_samples, numerical_parameters)
+    concrete_samples = generate_concrete_parameter_samples(num_samples, numerical_parameters, enum_parameters)
 
     print("\n🎯 Concrete Parameter Samples using Adaptive LHS:")
     for i, sample in enumerate(concrete_samples, start=1):
