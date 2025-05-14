@@ -37,7 +37,7 @@ def parameter_mapper(sample, parameters):
     for i, key in enumerate(parameters.keys()):
         spec = parameters[key]
 
-        if 'values' in spec:  # Enum/list case
+        if 'values' in spec:  # enum/list case
             num_options = len(spec['values'])
             index = int(np.floor(sample[i] * num_options))  # scales normalized sample to index space
             index = min(index, num_options - 1)  # upper bound safety
@@ -56,7 +56,7 @@ def parameter_mapper(sample, parameters):
 
     return mapped_values
 
-
+#FOR FUTURE GEAR CHECKERR
 def constraint_checker(mapped_values):
     """
     Check if the concrete parameter values satisfy all the constraints.

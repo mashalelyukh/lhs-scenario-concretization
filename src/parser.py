@@ -2,6 +2,9 @@ import re  # Core Functionality: manipulating strings based on patterns
 #to think about !=
 from lark import Lark
 
+
+
+# old parser, not used in the program now
 def extract_parameters(file_path):
     with open(file_path, 'r') as f:
         content = f.read()

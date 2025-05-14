@@ -8,8 +8,8 @@ dsl_range_grammar = r"""
 
     in_expr: param "in" "[" value RANGE_OP value "]"
     colon_expr: param ":" "[" value RANGE_OP value "]"
-    call_expr: param "(" "[" value RANGE_OP value "]" ("," extras)? ")"
-    extras: /[^)]+/
+    call_expr: param "(" "[" value RANGE_OP value "]" ("," EXTRAS)? ")"
+    EXTRAS: /[^)]+/
 
     enum_in_expr: param "in" "[" enum_values "]"
     enum_colon_expr: param ":" "[" enum_values "]"
@@ -39,38 +39,50 @@ class RangeTransformer(Transformer):
 
     def in_expr(self, items):
         param, min_val, _, max_val = items
-        return self._build_numeric("in", param, min_val, max_val)
+        return self.build_numeric("in", param, min_val, max_val)
 
     def colon_expr(self, items):
         param, min_val, _, max_val = items
-        return self._build_numeric("colon", param, min_val, max_val)
+        return self.build_numeric("colon", param, min_val, max_val)
 
     #def call_expr(self, items):
      #   param, min_val, _, max_val = items
-      #  return self._build_numeric("call", param, min_val, max_val)
+      #  return self.build_numeric("call", param, min_val, max_val)
 
     def call_expr(self, items):
         param, min_val, _, max_val, *rest = items
+        #old:
         extras = str(rest[0]) if rest else ""
+
+        #fourth: extras = rest[0] if rest else ""
+
+        #second: if rest:
+            # Join all text tokens from the extras tree or token
+         #   extras = self.extract_extras(rest[0])
+        #else:
+         #   extras = ""
+
+
+        #third: extras = rest[0].strip() if rest else ""
         return {
             "type": "call",
             "param": param,
             "min": float(min_val[0]),
             "max": float(max_val[0]),
             "unit": min_val[1] if min_val[1] else "",
-            "extras": extras
+            "extras": extras.strip()
         }
 
     def enum_in_expr(self, items):
-        return self._build_enum("in", *items)
+        return self.build_enum("in", *items)
 
     def enum_colon_expr(self, items):
-        return self._build_enum("colon", *items)
+        return self.build_enum("colon", *items)
 
     def enum_call_expr(self, items):
-        return self._build_enum("call", *items)
+        return self.build_enum("call", *items)
 
-    def _build_numeric(self, kind, param, min_val, max_val):
+    def build_numeric(self, kind, param, min_val, max_val):
         return {
             "type": kind,
             "param": param,
@@ -79,7 +91,7 @@ class RangeTransformer(Transformer):
             "unit": min_val[1] if min_val[1] else ""
         }
 
-    def _build_enum(self, kind, param, enum_values):
+    def build_enum(self, kind, param, enum_values):
         return {
             "type": kind,
             "param": param,
@@ -132,20 +144,37 @@ def extract_range_dsl_statements(content):
         ("enum_call", r'\b\w+\s*\(\s*\[\s*"[^"]+"(?:\s*,\s*"[^"]+")*\s*\]\s*\)')
     ]
 
-    for line in content.splitlines():
+    #old: for line in content.splitlines():
+    for line_number, line in enumerate(content.splitlines(), start=1):
         for label, pattern in patterns + enum_patterns:
             for match in re.finditer(pattern, line):
                 expr = match.group().strip()
+                span = match.span()
                 try:
                     tree = parser.parse(expr)
                     ast = transformer.transform(tree)
 
-                    # Only add metadata if ast is a dict
+                    # only add metadata if ast is a dict
                     if isinstance(ast, dict):
                         param_name = ast["param"]
-                        ast["type_annotation"] = param_types.get(param_name)
+                        #old: ast["type_annotation"] = param_types.get(param_name)
+                        raw_type = param_types.get(param_name)
+
+                        if "enum" in ast:
+                            ast["type_annotation"] = "string"
+                        elif raw_type in ("int", "float", "uint"):
+                            ast["type_annotation"] = raw_type
+                        else:
+                            # infer from min/max values if type is missing or non-numeric
+                            if ast["min"].is_integer() and ast["max"].is_integer():
+                                ast["type_annotation"] = "int"
+                            else:
+                                ast["type_annotation"] = "float"
+
                         ast["original"] = expr
                         ast["line"] = line
+                        ast["line_number"] = line_number
+                        ast["span"] = span
                         ast["type"] = label
 
                         if "enum" in ast:
