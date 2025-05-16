@@ -294,3 +294,33 @@ class BayesianOptimizer:
 
         # 6) Console feedback
         print(f"for {new_name} the expected criticality value is {y_pred:.3f}")
+
+
+
+#old parameter_mapper from lhs:
+def parameter_mapper(sample, parameters):
+    # foats -> linear scaling
+    # ints/uints -> equal-sized bins through floor mapping
+
+    mapped_values = {}
+    for i, key in enumerate(parameters.keys()):
+        spec = parameters[key]
+
+        if 'values' in spec:  # enum/list case
+            num_options = len(spec['values'])
+            index = int(np.floor(sample[i] * num_options))  # scales normalized sample to index space
+            index = min(index, num_options - 1)  # upper bound safety
+            concrete_value = spec['values'][index]
+        else:  # Numerical case
+            min_val = spec['min']
+            max_val = spec['max']
+            concrete_value = min_val + sample[i] * (
+                    max_val - min_val)  # scales the normalized value to the concrete range
+            if spec['type_annotation'] in ['int', 'uint']:
+                concrete_value = int(round(concrete_value))
+            else:
+                concrete_value = float(concrete_value)
+
+        mapped_values[key] = concrete_value
+
+    return mapped_values

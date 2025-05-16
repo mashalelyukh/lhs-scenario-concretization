@@ -1,0 +1,14 @@
+#code 38; 7.4.1.3
+scenario bar:
+    aspeed: float
+    afloat: float
+    gear: uint
+    keep(afloat in [10..20])
+    keep(gear in [0..6])
+
+scenario foo:
+    car: vehicle
+    do parallel(duration: [10s..20s]):
+        car.drive() with:
+            speed([80kph..120kph])
+        bar(aspeed: [20kph..40kph])

@@ -1,7 +1,7 @@
 import re
 from lark import Lark, Transformer
 
-#expr: param "in" "[" value ".." value "]"
+# expr: param "in" "[" value ".." value "]"
 
 dsl_range_grammar = r"""
     start: in_expr | colon_expr | call_expr | enum_in_expr | enum_colon_expr | enum_call_expr
@@ -32,7 +32,6 @@ dsl_range_grammar = r"""
 """
 
 
-
 class RangeTransformer(Transformer):
     def start(self, items):
         return items[0]
@@ -45,25 +44,24 @@ class RangeTransformer(Transformer):
         param, min_val, _, max_val = items
         return self.build_numeric("colon", param, min_val, max_val)
 
-    #def call_expr(self, items):
-     #   param, min_val, _, max_val = items
-      #  return self.build_numeric("call", param, min_val, max_val)
+    # def call_expr(self, items):
+    #   param, min_val, _, max_val = items
+    #  return self.build_numeric("call", param, min_val, max_val)
 
     def call_expr(self, items):
         param, min_val, _, max_val, *rest = items
-        #old:
+        # old:
         extras = str(rest[0]) if rest else ""
 
-        #fourth: extras = rest[0] if rest else ""
+        # fourth: extras = rest[0] if rest else ""
 
-        #second: if rest:
-            # Join all text tokens from the extras tree or token
-         #   extras = self.extract_extras(rest[0])
-        #else:
-         #   extras = ""
+        # second: if rest:
+        # Join all text tokens from the extras tree or token
+        #   extras = self.extract_extras(rest[0])
+        # else:
+        #   extras = ""
 
-
-        #third: extras = rest[0].strip() if rest else ""
+        # third: extras = rest[0].strip() if rest else ""
         return {
             "type": "call",
             "param": param,
@@ -110,6 +108,7 @@ class RangeTransformer(Transformer):
     def enum_values(self, items):
         return [s[1:-1] for s in items]
 
+
 def extract_param_types(content):
     param_types = {}
     for match in re.finditer(r"(?P<param>\w+)\s*:\s*(?P<type>\w+)", content):
@@ -118,24 +117,26 @@ def extract_param_types(content):
         param_types[param] = param_type
     return param_types
 
+
 def extract_range_dsl_statements(content):
-    #parser = Lark(dsl_range_grammar, start="expr")
     parser = Lark(dsl_range_grammar, start="start")
     transformer = RangeTransformer()
-    #results = []
     numerical_parameters = {}
     enum_parameters = {}
 
     param_types = {}
-    for match in re.finditer(r"(?P<param>\w+)\s*:\s*(?P<type>\w+)", content):
-        param_types[match.group("param")] = match.group("type")
+
+    for line in content.splitlines():
+        m = re.match(r"\s*(?P<param>\w+)\s*:\s*(?P<type>int|uint|float|string)\b", line)
+        if m:
+            param_types[m.group("param")] = m.group("type")
 
     patterns = [
         ("in", r"\b\w+\s+in\s+\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]"),
         ("colon", r"\b\w+\s*:\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]"),
-        #("call", r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*\)")
-        ("call", r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*(?:,\s*[^)]*)?\)")
-
+        # ("call", r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*\)")
+        ("call",
+         r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*(?:,\s*[^)]*)?\)")
     ]
 
     enum_patterns = [
@@ -144,10 +145,21 @@ def extract_range_dsl_statements(content):
         ("enum_call", r'\b\w+\s*\(\s*\[\s*"[^"]+"(?:\s*,\s*"[^"]+")*\s*\]\s*\)')
     ]
 
-    #old: for line in content.splitlines():
-    for line_number, line in enumerate(content.splitlines(), start=1):
+    # old: for line in content.splitlines():
+    for line_number, raw_line in enumerate(content.splitlines(), start=1):
+        # if not line.strip():
+        #   continue
+        stripped = raw_line.lstrip()
+        if not stripped or stripped.startswith('#'):
+            continue
+
+        code_part = raw_line
+        if '#' in raw_line:
+            code_part = raw_line.split('#', 1)[0]
+
         for label, pattern in patterns + enum_patterns:
-            for match in re.finditer(pattern, line):
+            # for match in re.finditer(pattern, line):
+            for match in re.finditer(pattern, code_part):
                 expr = match.group().strip()
                 span = match.span()
                 try:
@@ -157,69 +169,62 @@ def extract_range_dsl_statements(content):
                     # only add metadata if ast is a dict
                     if isinstance(ast, dict):
                         param_name = ast["param"]
-                        #old: ast["type_annotation"] = param_types.get(param_name)
+                        # old: ast["type_annotation"] = param_types.get(param_name)
                         raw_type = param_types.get(param_name)
 
-                        if "enum" in ast:
-                            ast["type_annotation"] = "string"
-                        elif raw_type in ("int", "float", "uint"):
+                        if raw_type in ("int", "uint", "float", "string"):
                             ast["type_annotation"] = raw_type
+                        elif ast.get("enum"):
+                            ast["type_annotation"] = "string"
                         else:
-                            # infer from min/max values if type is missing or non-numeric
-                            if ast["min"].is_integer() and ast["max"].is_integer():
+                            # fallback inference from numeric bounds
+                            if float(ast["min"]).is_integer() and float(ast["max"]).is_integer():
                                 ast["type_annotation"] = "int"
                             else:
                                 ast["type_annotation"] = "float"
 
+                        """if label.startswith("enum_") or "values" in ast:
+                            enum_parameters.setdefault(param_name, []).append(ast)
+                        else:
+                            numerical_parameters.setdefault(param_name, []).append(ast)"""
+
+                        # else:
+                        #   if ast["min"].is_integer() and ast["max"].is_integer():
+                        #      ast["type_annotation"] = "int"
+                        # else:
+                        #    ast["type_annotation"] = "float"
+
                         ast["original"] = expr
-                        ast["line"] = line
+                        # ast["line"] = line
+                        ast["line"] = raw_line
                         ast["line_number"] = line_number
                         ast["span"] = span
                         ast["type"] = label
 
+                        """added the next two lines and changed if in third line from here to elif"""
+
                         if "enum" in ast:
                             enum_parameters.setdefault(param_name, []).append(ast)
-                            #enum_parameters[param_name] = ast
-                        else:
-                            if ast["type_annotation"] is None:
-                            #???????????????????????????????????????????????????????????????????????
-                                if ast["min"].is_integer() and ast["max"].is_integer():
-                                   ast["type_annotation"] = "int"
-                                else:
-                                    ast["type_annotation"] = "float"
-                            #???????????????????????????????????????????????????????????????????????
+                        # else:
+                        # if ast["type_annotation"] is None:
+                        #   if ast["min"].is_integer() and ast["max"].is_integer():
+                        #     ast["type_annotation"] = "int"
+                        # else:
+                        #    ast["type_annotation"] = "float"
 
-                                #ast["type_annotation"] = "int"
-
-                                #if float(ast["min"]).is_integer() and float(ast["max"]).is_integer():
-                                 #   ast["type_annotation"] = "int"
-                                #else:
-                                 #   ast["type_annotation"] = "float"
-
-                            if ast["type_annotation"] in ("int", "uint"):
-                                ast["min"] = int(ast["min"])
-                                ast["max"] = int(ast["max"])
-                            elif ast["type_annotation"] == "float":
-                                ast["min"] = float(ast["min"])
-                                ast["max"] = float(ast["max"])
-
-                            #old: numerical_parameters[param_name] = ast
+                        elif ast["type_annotation"] in ("int", "uint"):
+                            ast["min"] = int(ast["min"])
+                            ast["max"] = int(ast["max"])
                             numerical_parameters.setdefault(param_name, []).append(ast)
-
-                            #ast["original"] = expr
-                            #ast["line"] = line
-                            #ast["type"] = label
-                            #results.append(ast)
+                        elif ast["type_annotation"] == "float":
+                            ast["min"] = float(ast["min"])
+                            ast["max"] = float(ast["max"])
+                            numerical_parameters.setdefault(param_name, []).append(ast)
+                        # numerical_parameters.setdefault(param_name, []).append(ast)
                     else:
                         print(f"Warning: parsed but transformer did not return a dict for: {expr}")
-                    #tree = parser.parse(expr)
-                    #ast = transformer.transform(tree)
-                    #ast["original"] = expr
-                    #ast["line"] = line
-                    #results.append(ast)
                 except Exception as e:
                     print(f"Failed to parse [{label}] pattern: {expr}\n{e}")
-    #return results
     return numerical_parameters, enum_parameters
 
 
@@ -227,12 +232,6 @@ def extract_parameters(file_path):
     with open(file_path, 'r') as f:
         content = f.read()
 
-    #numerical_parameters = {}
-    #enum_parameters = {}
-
     numerical_parameters, enum_parameters = extract_range_dsl_statements(content)
-
-    #for param_info in extract_range_dsl_statements(content):
-     #   numerical_parameters[param_info['param']] = param_info
 
     return numerical_parameters, enum_parameters
