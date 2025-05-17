@@ -44,24 +44,9 @@ class RangeTransformer(Transformer):
         param, min_val, _, max_val = items
         return self.build_numeric("colon", param, min_val, max_val)
 
-    # def call_expr(self, items):
-    #   param, min_val, _, max_val = items
-    #  return self.build_numeric("call", param, min_val, max_val)
-
     def call_expr(self, items):
         param, min_val, _, max_val, *rest = items
-        # old:
         extras = str(rest[0]) if rest else ""
-
-        # fourth: extras = rest[0] if rest else ""
-
-        # second: if rest:
-        # Join all text tokens from the extras tree or token
-        #   extras = self.extract_extras(rest[0])
-        # else:
-        #   extras = ""
-
-        # third: extras = rest[0].strip() if rest else ""
         return {
             "type": "call",
             "param": param,
@@ -145,10 +130,7 @@ def extract_range_dsl_statements(content):
         ("enum_call", r'\b\w+\s*\(\s*\[\s*"[^"]+"(?:\s*,\s*"[^"]+")*\s*\]\s*\)')
     ]
 
-    # old: for line in content.splitlines():
     for line_number, raw_line in enumerate(content.splitlines(), start=1):
-        # if not line.strip():
-        #   continue
         stripped = raw_line.lstrip()
         if not stripped or stripped.startswith('#'):
             continue
@@ -183,17 +165,6 @@ def extract_range_dsl_statements(content):
                             else:
                                 ast["type_annotation"] = "float"
 
-                        """if label.startswith("enum_") or "values" in ast:
-                            enum_parameters.setdefault(param_name, []).append(ast)
-                        else:
-                            numerical_parameters.setdefault(param_name, []).append(ast)"""
-
-                        # else:
-                        #   if ast["min"].is_integer() and ast["max"].is_integer():
-                        #      ast["type_annotation"] = "int"
-                        # else:
-                        #    ast["type_annotation"] = "float"
-
                         ast["original"] = expr
                         # ast["line"] = line
                         ast["line"] = raw_line
@@ -205,13 +176,6 @@ def extract_range_dsl_statements(content):
 
                         if "enum" in ast:
                             enum_parameters.setdefault(param_name, []).append(ast)
-                        # else:
-                        # if ast["type_annotation"] is None:
-                        #   if ast["min"].is_integer() and ast["max"].is_integer():
-                        #     ast["type_annotation"] = "int"
-                        # else:
-                        #    ast["type_annotation"] = "float"
-
                         elif ast["type_annotation"] in ("int", "uint"):
                             ast["min"] = int(ast["min"])
                             ast["max"] = int(ast["max"])

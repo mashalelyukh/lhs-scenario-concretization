@@ -3,92 +3,111 @@ from utils import ask_yes_no
 
 
 class BayesianOptimizer:
-    def __init__(self, param_bounds, acq_func="EI", random_state=42):
-        self.X_train = None
-        self.y_train = None
-        from skopt.space import Real, Categorical
+    def __init__(self, param_bounds, acq_func="UCB", kappa =2.0, random_state=42):
         from skopt.learning import GaussianProcessRegressor as GP
         from skopt.learning.gaussian_process.kernels import Matern, ConstantKernel, WhiteKernel
 
         self.param_bounds = param_bounds
-        self.random_state = random_state
+        self.rng = np.random.RandomState(random_state)
+        self.acq_func = acq_func
+        self.kappa = kappa
 
         self.dims = []
         for name, bounds in param_bounds.items():
             if isinstance(bounds, list):
-                self.dims.append((name, 'categorical', bounds))  # discrete params
+                # continious
+                kind, meta = 'categorical', bounds
+
             else:
-                self.dims.append((name, 'real', bounds))  # continious params
+                # assume a tuple (low, high)
+                low, high = bounds
+                # both endpoints are ints → integer
+                if isinstance(low, int) and isinstance(high, int):
+                    kind, meta = 'int', bounds
+                else:
+                    kind, meta = 'real', bounds
+
+            self.dims.append((name, kind, meta))
 
         kernel = ConstantKernel(1.0) * Matern(nu=2.5) + WhiteKernel(1e-6)
-        self.gp = GP(kernel=kernel, normalize_y=True,
+        #n_restarts_optimzer - to be found
+        self.gp = GP(kernel, True,
                      n_restarts_optimizer=2, random_state=random_state)
+        self.X_train = []
+        self.y_train = []
 
-    def fit(self, X, y):  # store raw training data
-        self.X_train = X  # list of lists of parameter values
-        self.y_train = np.asarray(y)  # list of criticality floats
+    def fit(self, X_raw, y_raw):  # store raw training data
+        X_num = self.encode(X_raw)
+        self.gp.fit(X_num, np.asarray(y_raw))
+        self.X_train = list(X_raw)  # list of lists of parameter values
+        self.y_train = list(y_raw)  # list of criticality floats
 
     def encode(self, X_raw): # list of lists to numeric array
-        X_num = []
+        rows = []
         for point in X_raw:
-            row = []
+            r = []
             for (name, kind, meta), raw in zip(self.dims, point):
-                if kind == 'real':
-                    row.append(raw)
-                else:  # discrete
-                    # map discrete to integer index
-                    cats = meta
-                    idx = cats.index(raw)
-                    row.append(idx)
-            X_num.append(row)
-        return np.array(X_num)
 
-    def sample_candidates(self, n_samples): #umifotmly sample n points in original parameter interval
+                if kind in ('real', 'int'):
+                    r.append(raw)
+                else: # only for enums
+                    r.append(meta.index(raw))
+            rows.append(r)
+        return np.array(rows)
+
+    def sample_candidates(self, n_cand): #umifotmly sample n points in original parameter interval
         cand = []
-        rng = np.random.RandomState(self.random_state)
-        for _ in range(n_samples):
+        for _ in range(n_cand):
             pt = []
             for name, kind, meta in self.dims:
                 if kind == 'real':
                     low, high = meta
-                    pt.append(rng.uniform(low, high))
+                    pt.append(self.rng.uniform(low, high))
+                elif kind == 'int':
+                    low, high = meta
+                    # draw integer in [lo..hi]
+                    pt.append(int(self.rng.randint(low, high + 1)))
                 else:
-                    pt.append(rng.choice(meta))
+                    pt.append(self.rng.choice(meta))
             cand.append(pt)
         return cand
 
-    def propose(self, K, C, n_candidates=200):  #fitting GP on data, select top-K
-        Xnum_train = self.encode(self.X_train)
-        self.gp.fit(Xnum_train, self.y_train)
+#???????????????????????????????????????
+    def acquisition(self, mu, sigma):
+        if self.acq_func == "UCB":
+            return mu + self.kappa * sigma
+        else:
+            raise NotImplementedError("Only UCB implemented.")
+#???????????????????????????????????????
 
+    def propose(self, K, n_candidates=200):  #select top-K scenarios
         Xcand = self.sample_candidates(n_candidates) # sample candidate pool in raw space
         Xnum = self.encode(Xcand) #encode candidates and predict
         mu, sigma = self.gp.predict(Xnum, return_std=True)
-        ucb = mu + 2 * sigma
+        acq = self.acquisition(mu, sigma)
 
-        # check feasibility
-        max_ucb = ucb.max()
-        if C > max_ucb:
-            print(f"Requested C={C:.2f} exceeds max achievable μ+2σ={max_ucb:.2f}.")
-            if ask_yes_no(f"Lower C to {max_ucb:.2f}? (yes/no)"):
-                C = max_ucb
-            else:
-                print("Proceeding with best-effort: top-K by mean μ.")
-                idx = np.argsort(-mu)[:K]
-                return [Xcand[i] for i in idx], mu[idx]
+        # logging every candidate
+        for x_raw, y_pred in zip(Xcand, mu):
+            # turn the raw list into a Python tuple for nicer output:
+            tup = tuple(x_raw)
+            print(f"Generated point {tup} → predicted criticality {y_pred:.3f}")
 
-        # select above threshold
-        sel = [i for i, m in enumerate(mu) if m >= C]
-        if len(sel) < K:
-            print(f"Only {len(sel)} ≥ {C:.2f}, filling to {K} with top μ.")
-            ranked = list(np.argsort(-mu))
-            for i in ranked:
-                if i not in sel and len(sel) < K:
-                    sel.append(i)
-        else:
-            sel = sel[:K]
+        # 4) Batch‐selection for diversity: random‐subset from the top-M
+        M = min(5 * K, len(acq))  # shortlist size
+        ranked = np.argsort(-acq)[:M]  # indices of top-M by acq
+        chosen = self.rng.choice(ranked, size=K, replace=False)
+        X_sel = [Xcand[i] for i in chosen]
+        y_sel = mu[chosen]
 
-        X_sel = [Xcand[i] for i in sel]
-        y_sel = mu[sel]
-        print(f"Proposed {len(X_sel)} scenarios (μ): {np.round(y_sel, 3)}")
-        return X_sel, y_sel #list of K raw vectors and predicted items
+        # pick top K
+        #idx = np.argsort(-acq)[:K]
+        #X_sel = [Xcand[i] for i in idx]
+        #y_sel = mu[idx]
+
+        # for controlling the points
+        for x_raw, y_pred in zip(X_sel, y_sel):
+            params_str = ", ".join(f"{name}={val!r}"
+                                   for (name, _, _), val in zip(self.dims, x_raw))
+            print(f"Generated point with {params_str} → predicted criticality {y_pred:.3f}")
+
+        return X_sel, y_sel  # list of K raw vectors and predicted items

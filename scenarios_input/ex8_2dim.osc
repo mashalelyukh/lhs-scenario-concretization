@@ -1,0 +1,10 @@
+#modified code 82 from 9.1.8
+scenario sut.my__scenario:
+    car1: vehicle
+    car2: vehicle
+
+    do serial:
+        phase1: car1.drive(duration: 24s) with:
+            speed([40kph..80kph], at: end) # first discrete (int) param
+        phase2: car1.drive(duration: 24s) with:
+            speed([70.0kph..60.0kph], at: end) #second float (continuous) param

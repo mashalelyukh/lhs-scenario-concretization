@@ -1,0 +1,10 @@
+#modified code 38; 7.4.1.3
+scenario bar:
+    weatherCondition: string
+
+scenario foo:
+    car: vehicle
+    do parallel(duration: 27s]):
+        keep(weatherCondition in ["sunny", "rainy", "foggy", "cloudy", "windy", "stormy"]) # enum parameter
+        car.drive() with:
+            speed([80.0kph..120.0kph]) # continuous parameter
