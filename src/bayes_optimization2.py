@@ -29,10 +29,24 @@ class BayesianOptimizer:
 
             self.dims.append((name, kind, meta))
 
-        kernel = ConstantKernel(1.0) * Matern(nu=2.5) + WhiteKernel(1e-6)
+        #kernel = ConstantKernel(1.0) * Matern(nu=2.5) + WhiteKernel(1e-6)
         #n_restarts_optimzer - to be found
-        self.gp = GP(kernel, True,
-                     n_restarts_optimizer=2, random_state=random_state)
+        #self.gp = GP(kernel, True, n_restarts_optimizer=2, random_state=random_state)
+
+        amplitude = ConstantKernel(1.0, (1e-2, 1e2))
+        matern = Matern(length_scale=10.0,
+                        length_scale_bounds=(1.0, 100.0),
+                        nu=2.5)
+        noise = WhiteKernel(noise_level=1e-3,
+                            noise_level_bounds=(1e-5, 1e-1))
+        kernel = amplitude * matern + noise
+
+        # Fit GP with more restarts for kernel optimization
+        self.gp = GP(kernel=kernel,
+                     normalize_y=True,
+                     n_restarts_optimizer=10,
+                     random_state=random_state)
+
         self.X_train = []
         self.y_train = []
 
