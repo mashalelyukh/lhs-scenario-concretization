@@ -1,0 +1,19 @@
+#modified code 38; 7.4.1.3
+#for demonstrating what happens by the type mismatch
+scenario bar:
+    aspeed: speed
+    afloat: int
+    gear: uint
+    accel: uint
+    weatherCondition: string
+    keep(afloat in [10.98..20.89])
+    keep(gear in [-1..6])
+
+scenario foo:
+    car: vehicle
+    do parallel(duration: [10s..20s]):
+        weatherCondition : ["sunny", "rainy", "foggy"]
+        car.drive() with:
+            speed([80kph..120kph])
+        bar(aspeed: [20.32kph..40.67kph])
+        accel([-3.24..5])

@@ -34,7 +34,7 @@ def clear_output_folder(folder_path):
             print(f"Failed to delete {file_path}. Reason: {e}")
 
 def get_labels(n):
-    example = " ".join(f"{(i+1)/(n+1):.2f}" for i in range(n))
+    example = " ".join(f"{(i+1)/(n+1):.3f}" for i in range(n))
     print(f"\nPlease enter {n} criticality values (floats between 0 and 1) separated by spaces.")
     print(f"Example for N={n}: {example}")
     while True:

@@ -1,5 +1,6 @@
 import re
 from lark import Lark, Transformer
+import math
 
 # expr: param "in" "[" value ".." value "]"
 
@@ -120,8 +121,8 @@ def extract_range_dsl_statements(content):
         ("in", r"\b\w+\s+in\s+\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]"),
         ("colon", r"\b\w+\s*:\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]"),
         # ("call", r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*\)")
-        ("call",
-         r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*(?:,\s*[^)]*)?\)")
+        ("call", r"\b\w+\s*\(\s*\[\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\.\.\s*-?\d+(?:\.\d+)?(?:[a-zA-Z]+)?\s*\]\s*(?:,"
+                 r"\s*[^)]*)?\)")
     ]
 
     enum_patterns = [
@@ -143,50 +144,74 @@ def extract_range_dsl_statements(content):
             # for match in re.finditer(pattern, line):
             for match in re.finditer(pattern, code_part):
                 expr = match.group().strip()
-                span = match.span()
+                #span = match.span()
                 try:
                     tree = parser.parse(expr)
                     ast = transformer.transform(tree)
 
-                    # only add metadata if ast is a dict
-                    if isinstance(ast, dict):
-                        param_name = ast["param"]
-                        # old: ast["type_annotation"] = param_types.get(param_name)
-                        raw_type = param_types.get(param_name)
+                    if not isinstance(ast, dict):
+                        continue
 
-                        if raw_type in ("int", "uint", "float", "string"):
-                            ast["type_annotation"] = raw_type
-                        elif ast.get("enum"):
-                            ast["type_annotation"] = "string"
-                        else:
-                            # fallback inference from numeric bounds
-                            if float(ast["min"]).is_integer() and float(ast["max"]).is_integer():
-                                ast["type_annotation"] = "int"
-                            else:
-                                ast["type_annotation"] = "float"
+                    # remember where it came from
+                    ast.update({
+                        "original": expr,
+                        "line": raw_line,
+                        "line_number": line_number,
+                        "span": match.span(),
+                        "type": label,
+                    })
 
-                        ast["original"] = expr
-                        # ast["line"] = line
-                        ast["line"] = raw_line
-                        ast["line_number"] = line_number
-                        ast["span"] = span
-                        ast["type"] = label
-
-                        """added the next two lines and changed if in third line from here to elif"""
-
-                        if "enum" in ast:
-                            enum_parameters.setdefault(param_name, []).append(ast)
-                        elif ast["type_annotation"] in ("int", "uint"):
-                            ast["min"] = int(ast["min"])
-                            ast["max"] = int(ast["max"])
-                            numerical_parameters.setdefault(param_name, []).append(ast)
-                        elif ast["type_annotation"] == "float":
-                            ast["min"] = float(ast["min"])
-                            ast["max"] = float(ast["max"])
-                            numerical_parameters.setdefault(param_name, []).append(ast)
-                        # numerical_parameters.setdefault(param_name, []).append(ast)
+                    # figure out declared type (or infer)
+                    raw_type = param_types.get(ast["param"])
+                    if raw_type in ("int", "uint", "float", "string"):
+                        ast["type_annotation"] = raw_type
+                    elif ast.get("enum"):
+                        ast["type_annotation"] = "string"
                     else:
-                        print(f"Warning: parsed but transformer did not return a dict for: {expr}")
+                        # fallback: integer if both bounds are integral
+                        if float(ast["min"]).is_integer() and float(ast["max"]).is_integer():
+                            ast["type_annotation"] = "int"
+                        else:
+                            ast["type_annotation"] = "float"
+
+                    # enums just pass through
+                    if ast.get("enum"):
+                        enum_parameters.setdefault(ast["param"], []).append(ast)
+                        continue
+
+                    # ASAM’s conversion rules fro numerics
+                    ta = ast["type_annotation"]
+                    orig_min = float(ast["min"])
+                    orig_max = float(ast["max"])
+
+                    if ta in ("int", "uint"):
+                        # detect mismatch: float bounds for int/uint, or negative in uint
+                        need_adjust = (
+                                orig_min != int(orig_min)
+                                or orig_max != int(orig_max)
+                                or (ta == "uint" and orig_min < 0)
+                        )
+
+                        if need_adjust:
+                            print(f"WARNING: Provided parameter range for {ast['param']} does not match the datatype")
+                            # ceil/floor then clamp to ≥0 if uint
+                            new_min = math.ceil(orig_min)
+                            new_max = math.floor(orig_max)
+                            if ta == "uint":
+                                new_min = max(new_min, 0)
+                                new_max = max(new_max, 0)
+                        else:
+                            new_min = int(orig_min)
+                            new_max = int(orig_max)
+
+                        ast["min"], ast["max"] = new_min, new_max
+                        numerical_parameters.setdefault(ast["param"], []).append(ast)
+
+                    elif ta == "float":
+                        # floats accept int or float implicitly
+                        ast["min"], ast["max"] = orig_min, orig_max
+                        numerical_parameters.setdefault(ast["param"], []).append(ast)
+
                 except Exception as e:
                     print(f"Failed to parse [{label}] pattern: {expr}\n{e}")
     return numerical_parameters, enum_parameters
