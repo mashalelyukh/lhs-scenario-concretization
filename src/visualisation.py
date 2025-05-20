@@ -83,109 +83,153 @@ def plot_parameter_ranges(numerical_parameters, enum_parameters, concrete_sample
     plt.tight_layout()
     plt.show()
 
-
-def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=None, y_sel=None, resolution=500):
-    param_names = list(ast_dict.keys())
-    if len(param_names) != 1:
-        print("Only 1D plotting is supported.")
+def plot_function_response(
+    f,
+    numerical_parameters: dict,
+    enum_parameters: dict = None,
+    bo=None,
+    concrete_samples=None,
+    x_sel=None,
+    resolution=500
+):
+    enum_parameters = enum_parameters or {}
+    # combine keys: must have exactly one total param
+    keys = list(numerical_parameters.keys()) + list(enum_parameters.keys())
+    if len(keys) != 1:
+        print("Only 1-D plotting is supported; received", keys)
         return
-    # --- unpack the single parameter's range ----
-    p = param_names[0]
-    lo = ast_dict[p][0]['min']
-    hi = ast_dict[p][0]['max']
+    p = keys[0]
 
-    # --- 1D grid of scalars ---
-    x_grid = np.linspace(lo, hi, resolution)  # shape (resolution,)
+    # --- ENUM case ---
+    if p in enum_parameters and p not in numerical_parameters:
+        vals = enum_parameters[p][0]['values']
+        N = len(vals)
+        # discrete x positions 0..N-1
+        xs = np.arange(N)
+        # objective f at encoded value i+1
+        y_obj = np.array([f([i+1]) for i in xs])
 
-    # --- true objective f(x) in gray ---
-    y_true = np.array([f([x]) for x in x_grid])
-    # two stacked planes
+        fig, (ax_f, ax_u) = plt.subplots(
+            2, 1, sharex=True,
+            figsize=(8, 6),
+            gridspec_kw={'height_ratios': [3,1]}
+        )
+        # plot objective
+        ax_f.plot(xs, y_obj, color='gray', lw=2, label=fr"objective $f({p})$")
+
+        # GP posterior?
+        if bo is not None:
+            # build raw lists of strings for encode()
+            Xraw = [[v] for v in vals]
+            Xnum = bo.encode(Xraw)
+            mu, sigma = bo.gp.predict(Xnum, return_std=True)
+            ax_f.plot(xs, mu, color='C0', lw=2, label=r"posterior mean $\mu(x)$")
+            ax_f.fill_between(xs, mu-sigma, mu+sigma,
+                              color='C0', alpha=0.2,
+                              label=r"uncertainty $\pm\sigma(x)$")
+
+        # concrete samples
+        if concrete_samples:
+            # count how many times each category was sampled
+            cnt = Counter(s[p+"_0"] for s in concrete_samples)
+            for cat, c in cnt.items():
+                i = vals.index(cat)
+                lbl = cat if c==1 else f"{cat}({c})"
+                ax_f.scatter(i,  f([i+1]), color='k', s=60, zorder=3)
+                ax_f.text(i, f([i+1])+0.02, lbl,
+                          ha='center', va='bottom', rotation=45, fontsize=8)
+
+        ax_f.set_ylabel("criticality")
+        ax_f.set_xticks(xs)
+        ax_f.set_xticklabels([f"{v}={i}" for i,v in enumerate(vals)])
+        ax_f.grid(True)
+
+        # acquisition plane
+        if bo is not None:
+            acq = bo.acquisition(mu, sigma)
+            ax_u.plot(xs, acq, color='limegreen', lw=2, alpha=0.6,
+                      label=fr"$f({bo.acq_func})(x)$")
+            # selected points
+            if x_sel is not None:
+                # x_sel are raw lists like ['foggy']
+                sel_idxs = [vals.index(x[0]) for x in x_sel]
+                # recompute ucb at those
+                Xnum_sel = bo.encode([[vals[i]] for i in sel_idxs])
+                mu_s, sigma_s = bo.gp.predict(Xnum_sel, return_std=True)
+                acq_s = bo.acquisition(mu_s, sigma_s)
+                ax_u.scatter(sel_idxs, acq_s,
+                             marker='v', color='C3', s=100,
+                             label="Selected")
+
+            ax_u.set_ylabel("acquisition")
+            ax_u.grid(True)
+
+        ax_u.set_xlabel(p)
+        # legends
+        h1,l1 = ax_f.get_legend_handles_labels()
+        h2,l2 = ax_u.get_legend_handles_labels()
+        ax_u.legend(h1+h2, l1+l2,
+                    loc='upper left', bbox_to_anchor=(0,-0.3),
+                    ncol=3, frameon=False)
+
+        plt.tight_layout()
+        plt.show()
+        return
+
+    # exactly one numeric (cont) parameter
+    lo = numerical_parameters[p][0]['min']
+    hi = numerical_parameters[p][0]['max']
+    x_grid = np.linspace(lo, hi, resolution)
+    y_obj = np.array([f([x]) for x in x_grid])
+
     fig, (ax_f, ax_u) = plt.subplots(
-        nrows=2,
-        ncols=1,
+        2, 1, sharex=True,
         figsize=(8, 6),
-        sharex=True,
-        gridspec_kw={'height_ratios': [3, 1]}
+        gridspec_kw={'height_ratios': [3,1]}
     )
-    ax_f.plot(x_grid, y_true,
+    ax_f.plot(x_grid, y_obj,
               color='gray', lw=2,
               label=fr"objective $f({p})$")
 
-    # --- GP posterior mean & ±1σ if bo is given ---
     if bo is not None:
-        # 1) turn x_grid into a list-of-lists [[x], …]
-        Xnum = bo.encode(x_grid.reshape(-1, 1).tolist())  # shape (resolution,1)
-
-        # 2) GP predict
+        Xnum = bo.encode([[x] for x in x_grid])
         mu, sigma = bo.gp.predict(Xnum, return_std=True)
-
-        # 3) posterior mean
-        ax_f.plot(x_grid, mu,
-                  color='C0', lw=2,
+        ax_f.plot(x_grid, mu, color='C0', lw=2,
                   label=r"posterior mean $\mu(x)$")
-
-        # 4) ±σ band
         ax_f.fill_between(x_grid,
-                          mu - sigma,
-                          mu + sigma,
+                          mu-sigma, mu+sigma,
                           color='C0', alpha=0.2,
                           label=r"uncertainty $\pm\sigma(x)$")
 
-    # --- concrete samples as black dots ---
     if concrete_samples:
         xs = [s[f"{p}_0"] for s in concrete_samples]
         ys = [s['criticality'] for s in concrete_samples]
-        ax_f.scatter(xs, ys,
-                     color='k', s=30,
-                     label="Concrete Samples")
+        ax_f.scatter(xs, ys, color='k', s=30, label='Concrete Samples')
 
-    # ???
     ax_f.set_ylabel("criticality")
     ax_f.grid(True)
 
-    # --- acquisition on twin axis ---
     if bo is not None:
-        acq_name = bo.acq_func
-        # ax_u = ax_f.twinx()
-
-        # compute acquisition
-        ucb = bo.acquisition(mu, sigma)
-        ax_u.plot(x_grid, ucb,
+        acq = bo.acquisition(mu, sigma)
+        ax_u.plot(x_grid, acq,
                   color='limegreen', lw=2, alpha=0.6,
-                  label=fr"$f({acq_name})$$(x)$")
-
-        # mark the K selected points on UCB
+                  label=fr"$f({bo.acq_func})(x)$")
         if x_sel is not None:
-            sel_x = [x[0] for x in x_sel]
-            # encode & predict at just those K points
-            Xnum_sel = bo.encode([[xx] for xx in sel_x])
-            mu_sel, sigma_sel = bo.gp.predict(Xnum_sel, return_std=True)
-            ucb_sel = bo.acquisition(mu_sel, sigma_sel)
-
-            ax_u.scatter(sel_x, ucb_sel,
+            xs_sel = [x[0] for x in x_sel]
+            Xnum_sel = bo.encode([[x] for x in xs_sel])
+            mu_s, sigma_s = bo.gp.predict(Xnum_sel, return_std=True)
+            acq_s = bo.acquisition(mu_s, sigma_s)
+            ax_u.scatter(xs_sel, acq_s,
                          marker='v', color='C3', s=100,
-                         label=fr"Selected $f({acq_name})$ pts")
+                         label="Selected")
         ax_u.set_ylabel("acquisition")
         ax_u.grid(True)
 
     ax_u.set_xlabel(p)
-
-    # combine legends from both axes
-    h1, l1 = ax_f.get_legend_handles_labels()
-    h2, l2 = ax_u.get_legend_handles_labels()
-    handles, labels = h1 + h2, l1 + l2
-    # else:
-    #   handles, labels = ax_f.get_legend_handles_labels()
-
-    # --- styling & legend below x-axis ---
-    # ax_f.set_xlabel(p)
-    # ax_f.set_ylabel("criticality")
-    # ax_f.grid(True)
-    # ax_f.set_title("Function & GP posterior + acquisition")
-
-    ax_u.legend(handles, labels,
-                loc='upper left',
-                bbox_to_anchor=(0, -0.3),
+    h1,l1 = ax_f.get_legend_handles_labels()
+    h2,l2 = ax_u.get_legend_handles_labels()
+    ax_u.legend(h1+h2, l1+l2,
+                loc='upper left', bbox_to_anchor=(0,-0.3),
                 ncol=3, frameon=False)
 
     plt.tight_layout()

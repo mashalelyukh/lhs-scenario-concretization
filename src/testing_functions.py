@@ -16,3 +16,7 @@ def f2(params):
             result += np.exp(-abs(p))
     # normalize using sigmoid to constrain to (0, 1)
     return 1 / (1 + np.exp(-result))
+
+
+
+

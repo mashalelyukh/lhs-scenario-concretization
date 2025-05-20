@@ -244,10 +244,10 @@ def main():
         plot_function_response(
             f2,
             numerical_parameters,
+            enum_parameters=enum_parameters,
             bo=bo,
             concrete_samples=concrete_samples,
-            x_sel=candidates,
-            y_sel=preds
+            x_sel=candidates
         )
         concrete_samples.extend(new_samples)
 
@@ -259,7 +259,7 @@ def main():
         #print(" ".join([str(f2(x)) for x in bo.X_train]))
 
         loop_num += 1
-    plot_function_response(f2, numerical_parameters, bo, concrete_samples, last_candidates, last_preds)
+    plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
 
 
 if __name__ == "__main__":
