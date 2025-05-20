@@ -138,9 +138,3 @@ def generate_concrete_parameter_samples(num_samples, numerical_parameters, enum_
         concrete_samples.append(mapped)
     return concrete_samples
 
-    # for sample in normalized_samples:
-    # map the normalized sample to concrete parameter values
-    #   mapped_values = parameter_mapper(sample, flat_parameters)
-    # concrete_samples.append(mapped_values)
-    # #optional(future): run additional iterations to improve the sample set
-    # return concrete_samples

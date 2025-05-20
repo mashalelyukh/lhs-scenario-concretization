@@ -214,7 +214,16 @@ def main():
             param_str = ", ".join(f"{n}={scen[n]}" for n in scen if n != "criticality")
             print(f"  Sample {i}: {{ {param_str} }} → criticality = {scen['criticality']:.3f}")
 
-        plot_function_response(f2, numerical_parameters, concrete_samples, candidates, preds)
+        #plot_function_response(f2, numerical_parameters, concrete_samples, candidates, preds)
+
+        plot_function_response(
+            f2,
+            numerical_parameters,
+            bo=bo,
+            concrete_samples=concrete_samples,
+            x_sel=candidates,
+            y_sel=preds
+        )
         concrete_samples.extend(new_samples)
 
         # re‐fit
@@ -225,7 +234,7 @@ def main():
         #print(" ".join([str(f2(x)) for x in bo.X_train]))
 
         loop_num += 1
-    plot_function_response(f2, numerical_parameters, concrete_samples, last_candidates, last_preds)
+    plot_function_response(f2, numerical_parameters, bo, concrete_samples, last_candidates, last_preds)
 
 
 if __name__ == "__main__":

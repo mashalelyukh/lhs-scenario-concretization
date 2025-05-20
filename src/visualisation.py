@@ -65,61 +65,96 @@ def plot_parameter_ranges(numerical_parameters, concrete_samples):
     plt.show()
 
 
-def plot_function_response(f, ast_dict, concrete_samples=None, x_sel=None, y_sel=None, resolution=500):
-    """
-    Plots the output of a multivariate function f over the ranges defined in ast_dict.
-    Only supports 1D or 2D parameter plots (more than 2 params won't be visualized directly).
-
-    Parameters:
-    - f: a function that takes a list of floats and returns a float in [0, 1]
-    - ast_dict: a dictionary with parameter names as keys and lists of parameter definitions (with 'min' and 'max')
-    - resolution: number of samples per dimension
-    """
+def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=None, y_sel=None, resolution=500):
     param_names = list(ast_dict.keys())
-    param_defs = [ast_dict[name][0] for name in param_names]
-    ranges = [(param['min'], param['max']) for param in param_defs]
+    if len(param_names) != 1:
+        print("Only 1D plotting is supported.")
+        return
 
-    if len(param_names) == 1:
-        x_vals = np.linspace(ranges[0][0], ranges[0][1], resolution)
-        y_vals = [f([x]) for x in x_vals]
+    # --- unpack the single parameter's range ----
+    p = param_names[0]
+    lo = ast_dict[p][0]['min']
+    hi = ast_dict[p][0]['max']
 
-        plt.figure(figsize=(8, 4))
-        plt.plot(x_vals, y_vals, label=f"f({param_names[0]})", linewidth=2)
+    # --- 1D grid of scalars ---
+    x_grid = np.linspace(lo, hi, resolution)           # shape (resolution,)
 
-        # Extract labels for axes
-        x_label = param_names[0]
-        y_label = "f2 output"
+    # --- true objective f(x) in gray ---
+    y_true = np.array([f([x]) for x in x_grid])
+    fig, ax_f = plt.subplots(figsize=(8, 4))
+    ax_f.plot(x_grid, y_true,
+              color='gray', lw=2,
+              label=fr"objective $f({p})$")
 
-        # Plot black concrete sample points
-        if concrete_samples:
-            first_sample = concrete_samples[0]
-            sample_keys = list(first_sample.keys())
-            x_key = next(k for k in sample_keys if k != 'criticality')
-            y_key = 'criticality'
+    # --- GP posterior mean & ±1σ if bo is given ---
+    if bo is not None:
+        # 1) turn x_grid into a list-of-lists [[x], …]
+        Xnum = bo.encode(x_grid.reshape(-1, 1).tolist())  # shape (resolution,1)
 
-            sample_x = [s[x_key] for s in concrete_samples]
-            sample_y = [s[y_key] for s in concrete_samples]
+        # 2) GP predict
+        mu, sigma = bo.gp.predict(Xnum, return_std=True)
 
-            x_label = re.sub(r"_\d+$", "", x_key)
-            y_label = y_key
+        # 3) posterior mean
+        ax_f.plot(x_grid, mu,
+                  color='C0', lw=2,
+                  label=r"posterior mean $\mu(x)$")
 
-            plt.scatter(sample_x, sample_y, color='black', label='Concrete Samples')
+        # 4) ±σ band
+        ax_f.fill_between(x_grid,
+                          mu - sigma,
+                          mu + sigma,
+                          color='C0', alpha=0.2,
+                          label=r"uncertainty $\pm\sigma(x)$")
 
-        # Plot red selected points
-        if x_sel is not None and y_sel is not None:
-            x_sel_flat = [x[0] for x in x_sel]
-            plt.scatter(x_sel_flat, y_sel, color='red', label='Selected Samples')
+    # --- concrete samples as black dots ---
+    if concrete_samples:
+        xs = [s[f"{p}_0"] for s in concrete_samples]
+        ys = [s['criticality']      for s in concrete_samples]
+        ax_f.scatter(xs, ys,
+                     color='k', s=30,
+                     label="Concrete Samples")
 
-        plt.xlabel(x_label)
-        plt.ylabel(y_label)
-        plt.title("Function f2 Output Over Parameter Range")
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
+    # --- acquisition on twin axis ---
+    if bo is not None:
+        ax_u = ax_f.twinx()
 
+        # compute UCB
+        ucb = bo.acquisition(mu, sigma)
+        ax_u.plot(x_grid, ucb,
+                  color='limegreen', lw=2, alpha=0.6,
+                  label=r"UCB$(x)$")
 
-    elif len(param_names) == 2:
-        print("2D plotting not supported with concrete samples in this version.")
+        # mark the K selected points on UCB
+        if x_sel is not None:
+            sel_x = [x[0] for x in x_sel]
+            # encode & predict at just those K points
+            Xnum_sel = bo.encode([[xx] for xx in sel_x])
+            mu_sel, sigma_sel = bo.gp.predict(Xnum_sel, return_std=True)
+            ucb_sel = bo.acquisition(mu_sel, sigma_sel)
+
+            ax_u.scatter(sel_x, ucb_sel,
+                         marker='v', color='C3', s=100,
+                         label="Selected UCB pts")
+
+        ax_u.set_ylabel("Acquisition")
+
+        # combine legends from both axes
+        h1, l1 = ax_f.get_legend_handles_labels()
+        h2, l2 = ax_u.get_legend_handles_labels()
+        handles, labels = h1 + h2, l1 + l2
     else:
-        print("Only 1D parameter plots are supported.")
+        handles, labels = ax_f.get_legend_handles_labels()
+
+    # --- styling & legend below x-axis ---
+    ax_f.set_xlabel(p)
+    ax_f.set_ylabel("criticality")
+    ax_f.grid(True)
+    ax_f.set_title("Function & GP posterior + acquisition")
+
+    ax_f.legend(handles, labels,
+                loc='upper left',
+                bbox_to_anchor=(0, -0.15),
+                ncol=3, frameon=False)
+
+    plt.tight_layout()
+    plt.show()

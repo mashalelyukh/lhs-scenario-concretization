@@ -100,51 +100,49 @@ class BayesianOptimizer:
     def propose(self, K, n_candidates=200):  #select top-K scenarios
         Xcand = self.sample_candidates(n_candidates) # sample candidate pool in raw space
         Xnum = self.encode(Xcand) #encode candidates and predict
-        #mu, sigma = self.gp.predict(Xnum, return_std=True)
-        #acq = self.acquisition(mu, sigma)
 
-        if self.acq_func == "UCB":
-            # the old UCB route
-            mu, sigma = self.gp.predict(Xnum, return_std=True)
-            acq = self.acquisition(mu, sigma)
+        # the UCB route:
+        mu, sigma = self.gp.predict(Xnum, return_std=True)
+        acq = self.acquisition(mu, sigma)
 
-            # logging every candidate
-            for x_raw, y_pred in zip(Xcand, mu):
-                # turn the raw list into a Python tuple for nicer output:
-                tup = tuple(x_raw)
-                print(f"Generated point {tup} → predicted criticality {y_pred:.3f}")
+        """ IF YOU WANT TO LOG ALL OF THE CANDIDATES
+        # logging every candidate
+        for x_raw, y_pred in zip(Xcand, mu):
+            # turn the raw list into a Python tuple for nicer output:
+            tup = tuple(x_raw)
+            print(f"Generated point {tup} → predicted criticality {y_pred:.3f}")
+        """
+        # working copy we can zero‐out
+        acq_work = acq.copy()
 
-            # working copy we can zero‐out
-            acq_work = acq.copy()
+        selected_idxs = []
+        # define your “no-go” radius in the encoded space:
+        # you’ll need to pick a number that makes sense for your parameters
+        radius = 0.05  # ← tune this!
 
-            selected_idxs = []
-            # define your “no-go” radius in the encoded space:
-            # you’ll need to pick a number that makes sense for your parameters
-            radius = 0.05  # ← tune this!
+        for _ in range(K):
+            # pick the next best point
+            idx = int(np.argmax(acq_work))
+            selected_idxs.append(idx)
 
-            for _ in range(K):
-                # pick the next best point
-                idx = int(np.argmax(acq_work))
-                selected_idxs.append(idx)
+            # compute distances from this pick to all candidates
+            dists = np.linalg.norm(Xnum - Xnum[idx], axis=1)
 
-                # compute distances from this pick to all candidates
-                dists = np.linalg.norm(Xnum - Xnum[idx], axis=1)
+            # penalize all points within `radius`, including itself
+            acq_work[dists <= radius] = -np.inf
 
-                # penalize all points within `radius`, including itself
-                acq_work[dists <= radius] = -np.inf
-
-                # if we’ve excluded everyone, “reset” so we can refill
-                if np.all(acq_work == -np.inf):
-                    acq_work = acq.copy()
+            # if we’ve excluded everyone, “reset” so we can refill
+            if np.all(acq_work == -np.inf):
+                acq_work = acq.copy()
 
                 # build your batch
-            X_sel = [Xcand[i] for i in selected_idxs]
-            y_sel = mu[selected_idxs]
+        X_sel = [Xcand[i] for i in selected_idxs]
+        y_sel = mu[selected_idxs]
 
-            for x_raw, y_pred in zip(X_sel, y_sel):
-                params_str = ", ".join(f"{name}={val!r}"
-                                       for (name, _, _), val in zip(self.dims, x_raw))
-                print(f"Generated point with {params_str} → predicted criticality {y_pred:.3f}")
+        for x_raw, y_pred in zip(X_sel, y_sel):
+            params_str = ", ".join(f"{name}={val!r}"
+                                   for (name, _, _), val in zip(self.dims, x_raw))
+            print(f"Generated point with {params_str} → predicted criticality {y_pred:.3f}")
 
         """
         # logging every candidate
