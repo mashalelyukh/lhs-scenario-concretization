@@ -81,7 +81,14 @@ def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=No
 
     # --- true objective f(x) in gray ---
     y_true = np.array([f([x]) for x in x_grid])
-    fig, ax_f = plt.subplots(figsize=(8, 4))
+    # two stacked planes
+    fig, (ax_f, ax_u) = plt.subplots(
+        nrows=2,
+        ncols=1,
+        figsize=(8, 6),
+        sharex=True,
+        gridspec_kw={'height_ratios': [3, 1]}
+    )
     ax_f.plot(x_grid, y_true,
               color='gray', lw=2,
               label=fr"objective $f({p})$")
@@ -109,14 +116,18 @@ def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=No
     # --- concrete samples as black dots ---
     if concrete_samples:
         xs = [s[f"{p}_0"] for s in concrete_samples]
-        ys = [s['criticality']      for s in concrete_samples]
+        ys = [s['criticality'] for s in concrete_samples]
         ax_f.scatter(xs, ys,
                      color='k', s=30,
                      label="Concrete Samples")
 
+    # ???
+    ax_f.set_ylabel("criticality")
+    ax_f.grid(True)
+
     # --- acquisition on twin axis ---
     if bo is not None:
-        ax_u = ax_f.twinx()
+        #ax_u = ax_f.twinx()
 
         # compute UCB
         ucb = bo.acquisition(mu, sigma)
@@ -136,24 +147,27 @@ def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=No
                          marker='v', color='C3', s=100,
                          label="Selected UCB pts")
 
-        ax_u.set_ylabel("Acquisition")
+        ax_u.set_ylabel("acquisition")
+        ax_u.grid(True)
 
-        # combine legends from both axes
-        h1, l1 = ax_f.get_legend_handles_labels()
-        h2, l2 = ax_u.get_legend_handles_labels()
-        handles, labels = h1 + h2, l1 + l2
-    else:
-        handles, labels = ax_f.get_legend_handles_labels()
+    ax_u.set_xlabel(p)
+
+    # combine legends from both axes
+    h1, l1 = ax_f.get_legend_handles_labels()
+    h2, l2 = ax_u.get_legend_handles_labels()
+    handles, labels = h1 + h2, l1 + l2
+    #else:
+     #   handles, labels = ax_f.get_legend_handles_labels()
 
     # --- styling & legend below x-axis ---
-    ax_f.set_xlabel(p)
-    ax_f.set_ylabel("criticality")
-    ax_f.grid(True)
-    ax_f.set_title("Function & GP posterior + acquisition")
+    #ax_f.set_xlabel(p)
+    #ax_f.set_ylabel("criticality")
+    #ax_f.grid(True)
+    #ax_f.set_title("Function & GP posterior + acquisition")
 
-    ax_f.legend(handles, labels,
+    ax_u.legend(handles, labels,
                 loc='upper left',
-                bbox_to_anchor=(0, -0.15),
+                bbox_to_anchor=(0, -0.3),
                 ncol=3, frameon=False)
 
     plt.tight_layout()
