@@ -9,6 +9,7 @@ def get_file_path(prompt_msg="Please enter the path to your logical scenario (.o
             return path
         print("File not found. Please try again.")
 
+
 def ask_yes_no(question):
     while True:
         ans = input(f"{question} (yes/no): ").strip().lower()
@@ -17,6 +18,7 @@ def ask_yes_no(question):
         if ans == "no":
             return False
         print("Please answer 'yes' or 'no'.")
+
 
 def clear_output_folder(folder_path):
     if not os.path.exists(folder_path):
@@ -33,8 +35,9 @@ def clear_output_folder(folder_path):
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
+
 def get_labels(n):
-    example = " ".join(f"{(i+1)/(n+1):.3f}" for i in range(n))
+    example = " ".join(f"{(i + 1) / (n + 1):.3f}" for i in range(n))
     print(f"\nPlease enter {n} criticality values (floats between 0 and 1) separated by spaces.")
     print(f"Example for N={n}: {example}")
     while True:
@@ -57,14 +60,16 @@ def get_labels(n):
             return values
         print("Let's try again.")
 
+
 def get_int(prompt, default=None):
     while True:
-        raw = input(f"{prompt}{' [default '+str(default)+']' if default is not None else ''}: ").strip()
+        raw = input(f"{prompt}{' [default ' + str(default) + ']' if default is not None else ''}: ").strip()
         if raw == "" and default is not None:
             return default
         if raw.isdigit():
             return int(raw)
         print("Please enter a valid integer.")
+
 
 def get_float(prompt, min_val=None, max_val=None):
     while True:
@@ -82,6 +87,7 @@ def get_float(prompt, min_val=None, max_val=None):
             continue
         return val
 
+
 def correct_types_afterBO(x_vec, param_names, numerical_parameters, enum_parameters):
     sample = {}
     for j, flat_name in enumerate(param_names):
@@ -93,12 +99,12 @@ def correct_types_afterBO(x_vec, param_names, numerical_parameters, enum_paramet
         if base in numerical_parameters:
             info = numerical_parameters[base][idx]
             t = info["type_annotation"]
-            #unit = info.get("unit", "")
+            # unit = info.get("unit", "")
             if t in ("int", "uint"):
                 val = int(round(raw))
             else:
                 val = float(raw)
-            #sample[flat_name] = f"{val}{unit}" if unit else val
+            # sample[flat_name] = f"{val}{unit}" if unit else val
             sample[flat_name] = val
 
         # Enum params
@@ -115,3 +121,45 @@ def correct_types_afterBO(x_vec, param_names, numerical_parameters, enum_paramet
 
     return sample
 
+
+def encode_enum(sample: dict, enum_parameters: dict) -> list[float]:
+    numeric = []
+    for full_key, val in sample.items():
+        # full_key is e.g. "speed_0" or "weatherCondition_0"
+        base = full_key.rsplit("_", 1)[0]
+        if base in enum_parameters:
+            # look up the list of possible strings
+            enum_vals = enum_parameters[base][0]["values"]
+            # map "rainy"->2 etc (index+1)
+            numeric.append(enum_vals.index(val) + 1)
+        else:
+            # it's already numeric
+            numeric.append(val)
+    return numeric
+
+
+def encode_sample(sample: dict,
+                  numerical_parameters: dict,
+                  enum_parameters: dict) -> list[float]:
+    """
+    Turn one concrete-sample dict into a pure-numeric list,
+    first all numeric params (in parser order), then all enums
+    as 1,2,3… in the order they were declared.
+    """
+    x = []
+    # 1) numeric first, in the same order extract_parameters gave you:
+    for name, infos in numerical_parameters.items():
+        for idx, info in enumerate(infos):
+            key = f"{name}_{idx}"
+            x.append(sample[key])
+
+    # 2) now encode each enum:
+    for name, infos in enum_parameters.items():
+        # there may be multiple enum‐slots, but typically idx=0
+        for idx, info in enumerate(infos):
+            key = f"{name}_{idx}"
+            raw = sample[key]  # e.g. "foggy"
+            values = info["values"]  # e.g. ["sunny","rainy","foggy",…]
+            x.append(values.index(raw) + 1)  # 1-based encoding
+
+    return x

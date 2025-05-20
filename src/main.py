@@ -9,7 +9,7 @@ from ranges_concretizer import concretize_scenario
 # from bayesian_optimization import BayesianOptimizer
 from bayes_optimization2 import BayesianOptimizer
 from testing_functions import f2
-from utils import ask_yes_no, get_file_path, clear_output_folder, get_labels, get_int, get_float, correct_types_afterBO
+from utils import ask_yes_no, get_file_path, clear_output_folder, get_labels, get_int, get_float, correct_types_afterBO, encode_sample
 from visualisation import plot_parameter_ranges, plot_function_response
 
 def main():
@@ -51,7 +51,7 @@ def main():
         num_samples, numerical_parameters, enum_parameters
     )
 
-    plot_parameter_ranges(numerical_parameters=numerical_parameters,
+    plot_parameter_ranges(numerical_parameters=numerical_parameters,enum_parameters=enum_parameters,
                           concrete_samples=concrete_samples)
 
     # for testing:
@@ -60,7 +60,13 @@ def main():
         print(f"  Sample {i}: {sample}")
 
     # mocking criticality
-    print(" ".join([str(f2(list(sample.values()))) for sample in concrete_samples]))
+    #print(" ".join([str(f2(list(sample.values()))) for sample in concrete_samples]))
+
+    print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+
+    #for sample in concrete_samples:
+     #   x_num = encode_sample(sample, numerical_parameters, enum_parameters)
+      #  print( f2(x_num) )
 
     flat_parameters = flatten_parameters(numerical_parameters, enum_parameters)
 
@@ -80,10 +86,6 @@ def main():
     if not ask_yes_no("\nWould you like to label these scenarios for criticality?"):
         print("Exiting since no criticality labels provided.")
         return
-
-    # print(f2())
-    # mocking criticality
-    #print(" ".join([str(f2(list(sample.values()))) for sample in concrete_samples]))
 
     # get the tuple of N floats in [0,1]
     labels = get_labels(num_samples)
@@ -140,7 +142,21 @@ def main():
         K = get_int("How many new scenarios do you want to generate?", 10)
         candidates, preds = bo.propose(K, n_candidates=200)
         # mocking criticality
-        print(" ".join([str(f2(x)) for x in candidates]))
+        #print(" ".join([str(f2(x)) for x in candidates]))
+
+        print("Predicted criticalities (mocked with f2 on encoded samples):")
+        formatted = []
+        for x_vec in candidates:
+            # turn vector back into a dict of flat_name→value
+            sample_dict = correct_types_afterBO(x_vec, param_names,
+                                                numerical_parameters,
+                                                enum_parameters)
+            # now encode enums+numerics into pure list
+            x_encoded = encode_sample(sample_dict,
+                                      numerical_parameters,
+                                      enum_parameters)
+            formatted.append(str(f2(x_encoded)))
+        print(" ".join(formatted))
 
         # count existing .osc files
         existing = [

@@ -3,9 +3,4 @@ lark
 skopt
 math
 numpy
-re
-os
-copy
-shutil
-glob
-time
+matplotlib
