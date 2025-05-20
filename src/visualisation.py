@@ -65,7 +65,7 @@ def plot_parameter_ranges(numerical_parameters, concrete_samples):
     plt.show()
 
 
-def plot_function_response(f, ast_dict, concrete_samples=None, resolution=500):
+def plot_function_response(f, ast_dict, concrete_samples=None, x_sel=None, y_sel=None, resolution=500):
     """
     Plots the output of a multivariate function f over the ranges defined in ast_dict.
     Only supports 1D or 2D parameter plots (more than 2 params won't be visualized directly).
@@ -86,7 +86,11 @@ def plot_function_response(f, ast_dict, concrete_samples=None, resolution=500):
         plt.figure(figsize=(8, 4))
         plt.plot(x_vals, y_vals, label=f"f({param_names[0]})", linewidth=2)
 
-        # Handle concrete sample overlay
+        # Extract labels for axes
+        x_label = param_names[0]
+        y_label = "f2 output"
+
+        # Plot black concrete sample points
         if concrete_samples:
             first_sample = concrete_samples[0]
             sample_keys = list(first_sample.keys())
@@ -96,20 +100,24 @@ def plot_function_response(f, ast_dict, concrete_samples=None, resolution=500):
             sample_x = [s[x_key] for s in concrete_samples]
             sample_y = [s[y_key] for s in concrete_samples]
 
-            base_x_label = re.sub(r"_\d+$", "", x_key)
+            x_label = re.sub(r"_\d+$", "", x_key)
+            y_label = y_key
 
-            plt.scatter(sample_x, sample_y, color='red', label='Concrete Samples')
-            plt.xlabel(base_x_label)
-            plt.ylabel(y_key)
-        else:
-            plt.xlabel(param_names[0])
-            plt.ylabel("f2 output")
+            plt.scatter(sample_x, sample_y, color='black', label='Concrete Samples')
 
+        # Plot red selected points
+        if x_sel is not None and y_sel is not None:
+            x_sel_flat = [x[0] for x in x_sel]
+            plt.scatter(x_sel_flat, y_sel, color='red', label='Selected Samples')
+
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
         plt.title("Function f2 Output Over Parameter Range")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
         plt.show()
+
 
     elif len(param_names) == 2:
         print("2D plotting not supported with concrete samples in this version.")

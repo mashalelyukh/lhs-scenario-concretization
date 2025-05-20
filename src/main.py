@@ -20,8 +20,6 @@ def main():
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    refresh_marker = os.path.join(output_dir, "._refresh_marker")
-    open(refresh_marker, "a").close()
 
     file_path = get_file_path()  # asking for logical scenario input file
 
@@ -77,7 +75,6 @@ def main():
     except Exception as e:
         pass
 
-    #os.utime(refresh_marker, None)
 
     # whether user wants to label the scenarios
     if not ask_yes_no("\nWould you like to label these scenarios for criticality?"):
@@ -85,6 +82,8 @@ def main():
         return
 
     # print(f2())
+    # mocking criticality
+    #print(" ".join([str(f2(list(sample.values()))) for sample in concrete_samples]))
 
     # get the tuple of N floats in [0,1]
     labels = get_labels(num_samples)
@@ -123,13 +122,17 @@ def main():
     loop_num = 1
     _, ext = os.path.splitext(os.path.basename(file_path))
 
+    last_candidates = []
+    last_preds = None
+
     # bayesian optimization loop (starts from second application of bo)
     while True:
         # propose K new points
         K = get_int("How many new scenarios do you want to generate?", 10)
         candidates, preds = bo.propose(K, n_candidates=200)
-        print(candidates, preds)
-        exit(0)
+        # mocking criticality
+        print(" ".join([str(f2(x)) for x in candidates]))
+
         # count existing .osc files
         existing = [
             f for f in os.listdir(output_dir)
@@ -146,7 +149,7 @@ def main():
         # base_name, ext = os.path.splitext(os.path.basename(file_path))
 
         tmp_dir = os.path.join(output_dir, "._tmp_new")
-
+        new_samples = list()
         for offset, (x_vec, y_pred) in enumerate(zip(candidates, preds), start=1):
             # convert types back to int/enum/float
             sample = correct_types_afterBO(
@@ -155,6 +158,7 @@ def main():
                 numerical_parameters,
                 enum_parameters
             )
+            new_samples.append(sample)
             # clean and make temp-directory
             if os.path.isdir(tmp_dir):
                 shutil.rmtree(tmp_dir)
@@ -193,22 +197,35 @@ def main():
             #os.utime(refresh_marker, None)
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        plot_function_response(f2, numerical_parameters, concrete_samples)
-
         if not ask_yes_no("\nWould you like to label these scenarios for criticality?"):
             print("Done here. Exiting BO loop.")
+            last_candidates = candidates
+            last_preds = preds
             break
 
-        # mocking criticality
-        print(" ".join([str(f2(list(sample.values()))) for sample in concrete_samples]))
-
         true_vals = get_labels(K)
+
+        for scenario, crit in zip(new_samples, true_vals):
+            scenario["criticality"] = crit
+
+        print("\n Criticality labels saved:")
+
+        for i, scen in enumerate(new_samples, 1):
+            param_str = ", ".join(f"{n}={scen[n]}" for n in scen if n != "criticality")
+            print(f"  Sample {i}: {{ {param_str} }} → criticality = {scen['criticality']:.3f}")
+
+        plot_function_response(f2, numerical_parameters, concrete_samples, candidates, preds)
+        concrete_samples.extend(new_samples)
 
         # re‐fit
         bo.fit(bo.X_train + candidates,
                bo.y_train + true_vals)
 
+        # mocking criticality
+        #print(" ".join([str(f2(x)) for x in bo.X_train]))
+
         loop_num += 1
+    plot_function_response(f2, numerical_parameters, concrete_samples, last_candidates, last_preds)
 
 
 if __name__ == "__main__":

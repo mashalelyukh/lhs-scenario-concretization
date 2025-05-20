@@ -51,8 +51,10 @@ class RangeTransformer(Transformer):
         return {
             "type": "call",
             "param": param,
-            "min": float(min_val[0]),
-            "max": float(max_val[0]),
+            #"min": float(min_val[0]),
+            #"max": float(max_val[0]),
+            "min": min_val,
+            "max": max_val,
             "unit": min_val[1] if min_val[1] else "",
             "extras": extras.strip()
         }
@@ -70,8 +72,10 @@ class RangeTransformer(Transformer):
         return {
             "type": kind,
             "param": param,
-            "min": float(min_val[0]),
-            "max": float(max_val[0]),
+            #"min": float(min_val[0]),
+            #"max": float(max_val[0]),
+            "min": min_val,
+            "max": max_val,
             "unit": min_val[1] if min_val[1] else ""
         }
 
@@ -87,9 +91,11 @@ class RangeTransformer(Transformer):
         return str(items[0])
 
     def value(self, items):
-        number = items[0]
+        number_token = str(items[0])
+        number = float(number_token)
+        is_explicit_float = '.' in number_token
         unit = items[1] if len(items) > 1 else None
-        return (number, str(unit) if unit else None)
+        return (number, str(unit) if unit else None, is_explicit_float)
 
     def enum_values(self, items):
         return [s[1:-1] for s in items]
@@ -161,23 +167,37 @@ def extract_range_dsl_statements(content):
                         "type": label,
                     })
 
+                    if ast.get("enum"):
+                        ast["type_annotation"] = "string"
+                        enum_parameters.setdefault(ast["param"], []).append(ast)
+                        continue
+
+                    # validating numeric structure
+                    if not ("min" in ast and "max" in ast):
+                        raise ValueError(f"Expected numeric fields 'min' and 'max' in AST: {ast}")
+
                     # figure out declared type (or infer)
                     raw_type = param_types.get(ast["param"])
+                    min_val, _, min_is_float = ast["min"]
+                    max_val, _, max_is_float = ast["max"]
+
                     if raw_type in ("int", "uint", "float", "string"):
                         ast["type_annotation"] = raw_type
-                    elif ast.get("enum"):
-                        ast["type_annotation"] = "string"
                     else:
-                        # fallback: integer if both bounds are integral
-                        if float(ast["min"]).is_integer() and float(ast["max"]).is_integer():
+                        if min_is_float or max_is_float:
+                            ast["type_annotation"] = "float"
+                        elif float(min_val).is_integer() and float(max_val).is_integer():
                             ast["type_annotation"] = "int"
                         else:
                             ast["type_annotation"] = "float"
 
+                    # flatten min/max
+                    ast["min"], ast["max"] = float(min_val), float(max_val)
+
                     # enums just pass through
-                    if ast.get("enum"):
-                        enum_parameters.setdefault(ast["param"], []).append(ast)
-                        continue
+                    #if ast.get("enum"):
+                     #   enum_parameters.setdefault(ast["param"], []).append(ast)
+                      #  continue
 
                     # ASAM’s conversion rules fro numerics
                     ta = ast["type_annotation"]
@@ -193,7 +213,8 @@ def extract_range_dsl_statements(content):
                         )
 
                         if need_adjust:
-                            print(f"WARNING: Provided parameter range for {ast['param']} does not match the datatype")
+                            print(
+                                f"WARNING: Provided parameter range for {ast['param']} does not match the datatype")
                             # ceil/floor then clamp to ≥0 if uint
                             new_min = math.ceil(orig_min)
                             new_max = math.floor(orig_max)
@@ -205,12 +226,11 @@ def extract_range_dsl_statements(content):
                             new_max = int(orig_max)
 
                         ast["min"], ast["max"] = new_min, new_max
-                        numerical_parameters.setdefault(ast["param"], []).append(ast)
 
                     elif ta == "float":
                         # floats accept int or float implicitly
                         ast["min"], ast["max"] = orig_min, orig_max
-                        numerical_parameters.setdefault(ast["param"], []).append(ast)
+                    numerical_parameters.setdefault(ast["param"], []).append(ast)
 
                 except Exception as e:
                     print(f"Failed to parse [{label}] pattern: {expr}\n{e}")
