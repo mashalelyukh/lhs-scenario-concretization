@@ -8,7 +8,7 @@ from lhs_sampler import generate_concrete_parameter_samples, flatten_parameters
 from ranges_concretizer import concretize_scenario
 # from bayesian_optimization import BayesianOptimizer
 from bayes_optimization2 import BayesianOptimizer
-from testing_functions import f2
+from testing_functions import f2, f3
 from utils import ask_yes_no, get_file_path, clear_output_folder, get_labels, get_int, get_float, correct_types_afterBO, encode_sample
 from visualisation import plot_parameter_ranges, plot_function_response
 
@@ -59,14 +59,10 @@ def main():
     for i, sample in enumerate(concrete_samples, start=1):
         print(f"  Sample {i}: {sample}")
 
-    # mocking criticality
-    #print(" ".join([str(f2(list(sample.values()))) for sample in concrete_samples]))
 
-    print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
-
-    #for sample in concrete_samples:
-     #   x_num = encode_sample(sample, numerical_parameters, enum_parameters)
-      #  print( f2(x_num) )
+    """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
+    #print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
 
     flat_parameters = flatten_parameters(numerical_parameters, enum_parameters)
 
@@ -141,21 +137,20 @@ def main():
         # propose K new points
         K = get_int("How many new scenarios do you want to generate?", 10)
         candidates, preds = bo.propose(K, n_candidates=200)
-        # mocking criticality
-        #print(" ".join([str(f2(x)) for x in candidates]))
 
-        print("Predicted criticalities (mocked with f2 on encoded samples):")
+        """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
+
+        print("Predicted criticalities (mocked with function on encoded samples):")
         formatted = []
         for x_vec in candidates:
-            # turn vector back into a dict of flat_name→value
             sample_dict = correct_types_afterBO(x_vec, param_names,
                                                 numerical_parameters,
                                                 enum_parameters)
-            # now encode enums+numerics into pure list
             x_encoded = encode_sample(sample_dict,
                                       numerical_parameters,
                                       enum_parameters)
-            formatted.append(str(f2(x_encoded)))
+            #formatted.append(str(f2(x_encoded)))
+            formatted.append(str(f3(x_encoded)))
         print(" ".join(formatted))
 
         # count existing .osc files
@@ -239,27 +234,22 @@ def main():
             param_str = ", ".join(f"{n}={scen[n]}" for n in scen if n != "criticality")
             print(f"  Sample {i}: {{ {param_str} }} → criticality = {scen['criticality']:.3f}")
 
-        #plot_function_response(f2, numerical_parameters, concrete_samples, candidates, preds)
 
-        plot_function_response(
-            f2,
-            numerical_parameters,
-            enum_parameters=enum_parameters,
-            bo=bo,
-            concrete_samples=concrete_samples,
-            x_sel=candidates
-        )
+        """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
+        #plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+
         concrete_samples.extend(new_samples)
 
         # re‐fit
         bo.fit(bo.X_train + candidates,
                bo.y_train + true_vals)
 
-        # mocking criticality
-        #print(" ".join([str(f2(x)) for x in bo.X_train]))
-
         loop_num += 1
-    plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+
+    """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
+    #plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
 
 
 if __name__ == "__main__":
