@@ -116,7 +116,16 @@ def main():
     # X = [[sc["params"][n] for n in param_names] for sc in concrete_samples]
     y = [sc["criticality"] for sc in concrete_samples]
 
-    bo = BayesianOptimizer(param_bounds)
+    # — let the user pick UCB, EI or PI —
+    valid = {"UCB", "EI", "PI"}
+    while True:
+        acq = input(
+            'Which acquisition function would you like to use for BO? (type "UCB", "EI", or "PI"): ').strip().upper()
+        if acq in valid:
+            break
+        print(f'  "{acq}" is not one of {valid}. Please try again.')
+
+    bo = BayesianOptimizer(param_bounds, acq_func=acq)
     bo.fit(X, y)
 
     loop_num = 1

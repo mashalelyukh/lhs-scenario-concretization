@@ -1,26 +1,15 @@
 import re
-
 import matplotlib.pyplot as plt
 import numpy as np
+from collections import defaultdict
 
+# plots parameter ranges with min/max labels and concrete sample values
 def plot_parameter_ranges(numerical_parameters, concrete_samples):
-    """
-    Plots parameter ranges with min/max labels and concrete sample values.
 
-    Parameters:
-    - numerical_parameters: list of dicts, each with 'param', 'min', 'max', 'unit', etc.
-    - concrete_samples: list of dicts, each mapping parameter keys to values.
-                        Keys may include suffixes like 'speed_0', 'speed1_0' etc.
-                        Matching is based on parameter name prefix.
-    """
-    import re
-    from collections import defaultdict
-
-    # Prepare a dictionary to collect all sample values for each parameter name
+    # prepare a dictionary to collect all sample values for each parameter name
     collected_samples = defaultdict(list)
 
-
-    # Extract all matching values from the concrete_samples list
+    # extract all matching values from the concrete_samples list
     for sample_dict in concrete_samples:
         for full_key, value in sample_dict.items():
             # TODO fix the zeros
@@ -42,19 +31,19 @@ def plot_parameter_ranges(numerical_parameters, concrete_samples):
 
         samples = collected_samples.get(name, [])
 
-        # Plot the range line with min/max markers
-        ax.plot([min_val, max_val], [0, 0], marker='o', linewidth=3, color='grey')
+        # plot the range line with min/max markers
+        ax.plot([min_val, max_val], [0, 0], marker='o', markersize=8, linewidth=3, color='grey', zorder=1)
 
-        # Plot and label concrete sample points
+        # plot and label concrete sample points
         for val in samples:
-            ax.scatter(val, 0, color='black')
-            ax.text(val, 0.05, f"{val:.2f}", ha='center', va='bottom', fontsize=8, rotation=45)
+            ax.scatter(val, 0, color='black', s=80, zorder=3)
+            ax.text(val, 0.05, f"{val:.2f}", ha='center', va='bottom', fontsize=8, rotation=45, zorder=3)
 
-        # Label min and max under the endpoint dots
+        # label min and max under the endpoint dots
         ax.text(min_val, -0.15, f"{min_val:.2f}", ha='center', va='top', fontsize=10, fontweight='bold')
         ax.text(max_val, -0.15, f"{max_val:.2f}", ha='center', va='top', fontsize=10, fontweight='bold')
 
-        # Clean up plot
+        # clean up plot
         ax.axis('off')
         title = f"{name}"
         if unit:
@@ -70,7 +59,6 @@ def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=No
     if len(param_names) != 1:
         print("Only 1D plotting is supported.")
         return
-
     # --- unpack the single parameter's range ----
     p = param_names[0]
     lo = ast_dict[p][0]['min']
@@ -127,13 +115,14 @@ def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=No
 
     # --- acquisition on twin axis ---
     if bo is not None:
+        acq_name = bo.acq_func
         #ax_u = ax_f.twinx()
 
-        # compute UCB
+        # compute acquisition
         ucb = bo.acquisition(mu, sigma)
         ax_u.plot(x_grid, ucb,
                   color='limegreen', lw=2, alpha=0.6,
-                  label=r"UCB$(x)$")
+                  label=fr"$f({acq_name})$$(x)$")
 
         # mark the K selected points on UCB
         if x_sel is not None:
@@ -145,8 +134,7 @@ def plot_function_response(f, ast_dict, bo=None, concrete_samples=None, x_sel=No
 
             ax_u.scatter(sel_x, ucb_sel,
                          marker='v', color='C3', s=100,
-                         label="Selected UCB pts")
-
+                         label=fr"Selected $f({acq_name})$ pts")
         ax_u.set_ylabel("acquisition")
         ax_u.grid(True)
 

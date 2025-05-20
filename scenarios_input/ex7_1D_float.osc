@@ -4,5 +4,6 @@ scenario sut.my__scenario:
 
     do serial:
         phase1: car1.drive(duration: 24s) with:
-            speed([40.0kph..80.0kph], at: end)
+            #speed([40.0kph..80.0kph], at: end)
+            speed([40kph..80kph], at: end)
             lane == 2
