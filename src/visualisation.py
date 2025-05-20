@@ -83,18 +83,141 @@ def plot_parameter_ranges(numerical_parameters, enum_parameters, concrete_sample
     plt.tight_layout()
     plt.show()
 
+
 def plot_function_response(
-    f,
-    numerical_parameters: dict,
-    enum_parameters: dict = None,
-    bo=None,
-    concrete_samples=None,
-    x_sel=None,
-    resolution=500
+        f,
+        numerical_parameters: dict,
+        enum_parameters: dict = None,
+        bo=None,
+        concrete_samples=None,
+        x_sel=None,
+        resolution=500
 ):
     enum_parameters = enum_parameters or {}
     # combine keys: must have exactly one total param
     keys = list(numerical_parameters.keys()) + list(enum_parameters.keys())
+
+    # Special case: exactly one numerical parameter AND exactly one enum parameter
+    if len(numerical_parameters) == 1 and len(enum_parameters) == 1:
+        num_param = list(numerical_parameters.keys())[0]
+        enum_param = list(enum_parameters.keys())[0]
+
+        # Get enum values and numerical param range
+        enum_vals = enum_parameters[enum_param][0]['values']
+        N_enum = len(enum_vals)
+        lo = numerical_parameters[num_param][0]['min']
+        hi = numerical_parameters[num_param][0]['max']
+
+        # Create a figure with 2 rows (objective and acquisition) and N_enum columns
+        fig, axes = plt.subplots(
+            2, N_enum,
+            figsize=(5 * N_enum, 8),
+            sharex='col',
+            sharey='row',
+            gridspec_kw={'height_ratios': [3, 1]}
+        )
+
+        # If only one enum value, ensure axes is still a 2D array
+        if N_enum == 1:
+            axes = np.array(axes).reshape(2, 1)
+
+        # Prepare x grid for numerical parameter
+        x_grid = np.linspace(lo, hi, resolution)
+
+        # Loop through each enum value
+        for i, enum_val in enumerate(enum_vals):
+            ax_f = axes[0, i]  # Top row for objective function
+            ax_u = axes[1, i]  # Bottom row for acquisition function
+
+            # Function to map [num_val, enum_val] to proper encoding for the objective function
+            def eval_f_at(x):
+                # For the test function, encode enum as i+1
+                return f([x, i + 1])
+
+            # Calculate objective function values
+            y_obj = np.array([eval_f_at(x) for x in x_grid])
+
+            # Plot objective function
+            ax_f.plot(x_grid, y_obj, color='gray', lw=2, label=fr"objective $f({num_param}|{enum_param}={enum_val})$")
+
+            # Add title to the column
+            ax_f.set_title(f"{enum_param} = {enum_val}", fontsize=12)
+
+            # GP posterior and acquisition if available
+            if bo is not None:
+                # Encode the input for GP prediction
+                # Create inputs that combine the numerical value with the enum value
+                combined_inputs = [[x, enum_val] for x in x_grid]
+                Xnum = bo.encode(combined_inputs)
+                mu, sigma = bo.gp.predict(Xnum, return_std=True)
+
+                # Plot mean and uncertainty
+                ax_f.plot(x_grid, mu, color='C0', lw=2, label=r"posterior mean $\mu(x)$")
+                ax_f.fill_between(x_grid, mu - sigma, mu + sigma,
+                                  color='C0', alpha=0.2,
+                                  label=r"uncertainty $\pm\sigma(x)$")
+
+                # Plot acquisition function
+                acq = bo.acquisition(mu, sigma)
+                ax_u.plot(x_grid, acq,
+                          color='limegreen', lw=2, alpha=0.6,
+                          label=fr"$f({bo.acq_func})(x)$")
+
+                # Plot selected points if available
+                if x_sel is not None:
+                    # Filter selected points for this enum value
+                    x_sel_filtered = [x for x in x_sel if x[1] == enum_val]
+                    if x_sel_filtered:
+                        xs_sel = [x[0] for x in x_sel_filtered]
+                        Xnum_sel = bo.encode(x_sel_filtered)
+                        mu_s, sigma_s = bo.gp.predict(Xnum_sel, return_std=True)
+                        acq_s = bo.acquisition(mu_s, sigma_s)
+                        ax_u.scatter(xs_sel, acq_s,
+                                     marker='v', color='C3', s=100,
+                                     label="Selected")
+
+            # Plot concrete samples if available
+            if concrete_samples:
+                # Filter samples for this enum value
+                filtered_samples = [s for s in concrete_samples
+                                    if s.get(f"{enum_param}_0") == enum_val]
+                if filtered_samples:
+                    xs = [s[f"{num_param}_0"] for s in filtered_samples]
+                    ys = [s['criticality'] for s in filtered_samples]
+                    ax_f.scatter(xs, ys, color='k', s=30, label='Concrete Samples')
+
+            # Add grid and labels
+            ax_f.grid(True)
+            ax_u.grid(True)
+
+            # Only add y-labels to leftmost column
+            if i == 0:
+                ax_f.set_ylabel("criticality")
+                ax_u.set_ylabel("acquisition")
+
+            # Add x-label to bottom row
+            ax_u.set_xlabel(num_param)
+
+        # Create a single legend for the entire figure
+        handles = []
+        labels = []
+        for ax in axes.flatten():
+            h, l = ax.get_legend_handles_labels()
+            for hi, li in zip(h, l):
+                if li not in labels:
+                    handles.append(hi)
+                    labels.append(li)
+
+        fig.legend(handles, labels,
+                   loc='lower center', bbox_to_anchor=(0.5, 0),
+                   ncol=min(4, len(handles)), frameon=False)
+
+        plt.tight_layout()
+        plt.subplots_adjust(bottom=0.15)  # Make room for the legend
+        plt.show()
+        return
+
+    # Handle case with exactly one parameter (either numerical or enum)
     if len(keys) != 1:
         print("Only 1-D plotting is supported; received", keys)
         return
@@ -107,12 +230,12 @@ def plot_function_response(
         # discrete x positions 0..N-1
         xs = np.arange(N)
         # objective f at encoded value i+1
-        y_obj = np.array([f([i+1]) for i in xs])
+        y_obj = np.array([f([i + 1]) for i in xs])
 
         fig, (ax_f, ax_u) = plt.subplots(
             2, 1, sharex=True,
             figsize=(8, 6),
-            gridspec_kw={'height_ratios': [3,1]}
+            gridspec_kw={'height_ratios': [3, 1]}
         )
         # plot objective
         ax_f.plot(xs, y_obj, color='gray', lw=2, label=fr"objective $f({p})$")
@@ -124,24 +247,24 @@ def plot_function_response(
             Xnum = bo.encode(Xraw)
             mu, sigma = bo.gp.predict(Xnum, return_std=True)
             ax_f.plot(xs, mu, color='C0', lw=2, label=r"posterior mean $\mu(x)$")
-            ax_f.fill_between(xs, mu-sigma, mu+sigma,
+            ax_f.fill_between(xs, mu - sigma, mu + sigma,
                               color='C0', alpha=0.2,
                               label=r"uncertainty $\pm\sigma(x)$")
 
         # concrete samples
         if concrete_samples:
             # count how many times each category was sampled
-            cnt = Counter(s[p+"_0"] for s in concrete_samples)
+            cnt = Counter(s[p + "_0"] for s in concrete_samples)
             for cat, c in cnt.items():
                 i = vals.index(cat)
-                lbl = cat if c==1 else f"{cat}({c})"
-                ax_f.scatter(i,  f([i+1]), color='k', s=60, zorder=3)
-                ax_f.text(i, f([i+1])+0.02, lbl,
+                lbl = cat if c == 1 else f"{cat}({c})"
+                ax_f.scatter(i, f([i + 1]), color='k', s=60, zorder=3)
+                ax_f.text(i, f([i + 1]) + 0.02, lbl,
                           ha='center', va='bottom', rotation=45, fontsize=8)
 
         ax_f.set_ylabel("criticality")
         ax_f.set_xticks(xs)
-        ax_f.set_xticklabels([f"{v}={i}" for i,v in enumerate(vals)])
+        ax_f.set_xticklabels([f"{v}={i}" for i, v in enumerate(vals)])
         ax_f.grid(True)
 
         # acquisition plane
@@ -166,10 +289,10 @@ def plot_function_response(
 
         ax_u.set_xlabel(p)
         # legends
-        h1,l1 = ax_f.get_legend_handles_labels()
-        h2,l2 = ax_u.get_legend_handles_labels()
-        ax_u.legend(h1+h2, l1+l2,
-                    loc='upper left', bbox_to_anchor=(0,-0.3),
+        h1, l1 = ax_f.get_legend_handles_labels()
+        h2, l2 = ax_u.get_legend_handles_labels()
+        ax_u.legend(h1 + h2, l1 + l2,
+                    loc='upper left', bbox_to_anchor=(0, -0.3),
                     ncol=3, frameon=False)
 
         plt.tight_layout()
@@ -185,7 +308,7 @@ def plot_function_response(
     fig, (ax_f, ax_u) = plt.subplots(
         2, 1, sharex=True,
         figsize=(8, 6),
-        gridspec_kw={'height_ratios': [3,1]}
+        gridspec_kw={'height_ratios': [3, 1]}
     )
     ax_f.plot(x_grid, y_obj,
               color='gray', lw=2,
@@ -197,7 +320,7 @@ def plot_function_response(
         ax_f.plot(x_grid, mu, color='C0', lw=2,
                   label=r"posterior mean $\mu(x)$")
         ax_f.fill_between(x_grid,
-                          mu-sigma, mu+sigma,
+                          mu - sigma, mu + sigma,
                           color='C0', alpha=0.2,
                           label=r"uncertainty $\pm\sigma(x)$")
 
@@ -226,10 +349,10 @@ def plot_function_response(
         ax_u.grid(True)
 
     ax_u.set_xlabel(p)
-    h1,l1 = ax_f.get_legend_handles_labels()
-    h2,l2 = ax_u.get_legend_handles_labels()
-    ax_u.legend(h1+h2, l1+l2,
-                loc='upper left', bbox_to_anchor=(0,-0.3),
+    h1, l1 = ax_f.get_legend_handles_labels()
+    h2, l2 = ax_u.get_legend_handles_labels()
+    ax_u.legend(h1 + h2, l1 + l2,
+                loc='upper left', bbox_to_anchor=(0, -0.3),
                 ncol=3, frameon=False)
 
     plt.tight_layout()

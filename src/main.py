@@ -61,8 +61,8 @@ def main():
 
 
     """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
-    #print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
-    print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    #print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
 
     flat_parameters = flatten_parameters(numerical_parameters, enum_parameters)
 
@@ -149,8 +149,8 @@ def main():
             x_encoded = encode_sample(sample_dict,
                                       numerical_parameters,
                                       enum_parameters)
-            #formatted.append(str(f2(x_encoded)))
-            formatted.append(str(f3(x_encoded)))
+            formatted.append(str(f2(x_encoded)))
+            #formatted.append(str(f3(x_encoded)))
         print(" ".join(formatted))
 
         # count existing .osc files
@@ -236,8 +236,8 @@ def main():
 
 
         """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
-        #plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
-        plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        #plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
 
         concrete_samples.extend(new_samples)
 
@@ -248,8 +248,8 @@ def main():
         loop_num += 1
 
     """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
-    #plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
-    plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    #plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
 
 
 if __name__ == "__main__":
