@@ -26,7 +26,7 @@ def flatten_parameters(numerical_parameters, enum_parameters):  # flattens param
 # for M discrete possible values and N scenarios:
 # if M >= N, sample N unique values without replacement
 # if M < N, sample each value N/M times, random remainder
-def adaptive_lhs_sampler(num_samples, parameter_specs):
+def lhs_sampling(num_samples, parameter_specs):
     num_parameters = len(parameter_specs)
     samples = np.empty((num_samples, num_parameters))  # empty array to hold the samples
 
@@ -125,7 +125,7 @@ def adjust_sampling_strategy(mapped_values):
 def generate_concrete_parameter_samples(num_samples, numerical_parameters, enum_parameters):
     normalize_ranges(numerical_parameters)
     flat_parameters = flatten_parameters(numerical_parameters, enum_parameters)
-    normalized_samples, discrete_map = adaptive_lhs_sampler(num_samples, flat_parameters)
+    normalized_samples, discrete_map = lhs_sampling(num_samples, flat_parameters)
     concrete_samples = []
 
     for i in range(num_samples):

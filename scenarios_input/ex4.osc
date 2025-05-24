@@ -1,5 +1,5 @@
 #Code 29 scenario field 7.3.6.2.2
-#is it even logical?
+#modified to be logical
 enum storm_type: [rain_storm, ice_storm, snow_storm]
 
 struct storm_data:
@@ -9,5 +9,5 @@ struct storm_data:
 scenario env.snowstorm:
     storm_data: storm_data with:
         keep(it.storm == snow_storm)
-        keep(default it.wind_velocity >= 30kmph)
+        keep(default it.wind_velocity: [20kmph..40kmph])
         cover(wind_velocity, expression: it.wind_velocity, unit: kmph)

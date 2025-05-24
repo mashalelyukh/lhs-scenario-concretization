@@ -1,6 +1,5 @@
 #for python packages
 lark
-skopt
-math
+scikit-optimize
 numpy
 matplotlib

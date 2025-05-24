@@ -1,4 +1,3 @@
-import re
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict, Counter

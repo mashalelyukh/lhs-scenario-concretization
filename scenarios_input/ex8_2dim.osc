@@ -7,4 +7,4 @@ scenario sut.my__scenario:
         phase1: car1.drive(duration: 24s) with:
             speed([40kph..80kph], at: end) # first discrete (int) param
         phase2: car1.drive(duration: 24s) with:
-            speed([70.0kph..60.0kph], at: end) #second float (continuous) param
+            speed1([70.0kph..60.0kph], at: end) #second float (continuous) param

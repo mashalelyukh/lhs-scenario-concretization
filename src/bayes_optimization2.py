@@ -1,5 +1,4 @@
 import numpy as np
-from utils import ask_yes_no
 from scipy.stats import norm
 
 
