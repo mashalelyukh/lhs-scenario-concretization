@@ -7,4 +7,6 @@ scenario foo:
     do parallel(duration: 27s]):
         keep(weatherCondition in ["sunny", "rainy", "foggy", "cloudy", "windy", "stormy"]) # enum parameter
         car.drive() with:
-            speed([80.0kph..120.0kph]) # continuous parameter
+            speed([80.0kph..120.0kph]) # continuous parameter speed([80.0kph..120.0kph])
+
+            

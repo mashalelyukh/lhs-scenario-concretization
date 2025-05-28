@@ -6,3 +6,6 @@ scenario sut.my__scenario:
         phase1: car1.drive(duration: 24s) with:
             speed([40.0kph..80.0kph], at: end)
             lane == 2
+
+
+

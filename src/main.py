@@ -3,14 +3,18 @@ import shutil
 from lark_parser import extract_parameters
 from lhs_sampler import generate_concrete_parameter_samples, flatten_parameters
 from ranges_concretizer import concretize_scenario
-from bayes_optimization2 import BayesianOptimizer
-from testing_functions import f2, f3
+from bayes_optimization import BayesianOptimizer
+from mock_functions import f2, f3
 from cli import (get_file_path, ask_num_samples, show_parameters, show_samples, ask_acquisition_function,
                  ask_new_scenario_count, show_generation_results, confirm_and_get_labels, show_label_summary)
 from utils import correct_types_afterBO, encode_sample
-from visualisation import plot_parameter_ranges, plot_function_response
+from visualization import plot_parameter_ranges, plot_function_response
 from file_manager import (init_output_dir, get_tmp_dir, ensure_clean_dir, count_scenarios, move_scenario_from_tmp,
                           refresh_output_dir)
+
+import warnings
+from sklearn.exceptions import ConvergenceWarning
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 
 def main():
@@ -35,9 +39,8 @@ def main():
     show_samples(concrete_samples)
 
     """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
-    print(" ".join(
-        [str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
-    # print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    #print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
 
     flat_parameters = flatten_parameters(numerical_parameters, enum_parameters)
 
@@ -101,8 +104,8 @@ def main():
             x_encoded = encode_sample(sample_dict,
                                       numerical_parameters,
                                       enum_parameters)
-            formatted.append(str(f2(x_encoded)))
-            # formatted.append(str(f3(x_encoded)))
+            # formatted.append(str(f2(x_encoded)))
+            formatted.append(str(f3(x_encoded)))
         print(" ".join(formatted))
 
         # count existing .osc files
@@ -139,9 +142,8 @@ def main():
         show_label_summary(new_samples)
 
         """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT BOTH LINES OUT)"""
-        plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo,
-                               concrete_samples=concrete_samples, x_sel=candidates)
-        # plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        #plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
 
         # re‐fit
         concrete_samples.extend(new_samples)
@@ -149,8 +151,8 @@ def main():
         loop_num += 1
 
     """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT BOTH LINES OUT)"""
-    plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
-    # plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    #plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
 
 
 if __name__ == "__main__":

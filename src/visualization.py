@@ -11,7 +11,6 @@ def plot_parameter_ranges(numerical_parameters, enum_parameters, concrete_sample
     # extract all matching values from the concrete_samples list
     for sample in concrete_samples:
         for full_key, val in sample.items():
-            # TODO fix the zeros
             param = full_key.split('_')[0]
             collected[param].append(val)
 
