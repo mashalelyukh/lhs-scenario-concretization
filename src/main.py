@@ -38,9 +38,11 @@ def main():
     # for testing:
     show_samples(concrete_samples)
 
-    """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
-    #print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
-    print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)
+        F2 IS CAPABLE OF TAKING ANY NUMBER OF PARAMETERS
+        F3 IS A POLYNOM OF 5TH GRADE THAT TAKES ONLY ONE PARAMETER"""
+    print(" ".join([str(f2(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
+    #print(" ".join([str(f3(encode_sample(sample, numerical_parameters, enum_parameters))) for sample in concrete_samples]))
 
     flat_parameters = flatten_parameters(numerical_parameters, enum_parameters)
 
@@ -93,7 +95,9 @@ def main():
         K = ask_new_scenario_count(default=10)
         candidates, preds = bo.propose(K, n_candidates=200)
 
-        """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)"""
+        """TO MOCK CRITICALITY FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT THEM ALL OUT)
+        F2 IS CAPABLE OF TAKING ANY NUMBER OF PARAMETERS
+        F3 IS A POLYNOM OF 5TH GRADE THAT TAKES ONLY ONE PARAMETER"""
 
         print("Predicted criticalities (mocked with function on encoded samples):")
         formatted = []
@@ -104,8 +108,8 @@ def main():
             x_encoded = encode_sample(sample_dict,
                                       numerical_parameters,
                                       enum_parameters)
-            # formatted.append(str(f2(x_encoded)))
-            formatted.append(str(f3(x_encoded)))
+            formatted.append(str(f2(x_encoded)))
+            #formatted.append(str(f3(x_encoded)))
         print(" ".join(formatted))
 
         # count existing .osc files
@@ -141,18 +145,24 @@ def main():
 
         show_label_summary(new_samples)
 
-        """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT BOTH LINES OUT)"""
-        #plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
-        plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        """TO PLOT CHOOSE FROM FOLLOWING PRINTS ONE OF THE AVAILABLE MOCK FUNCTIONS
+        (OR COMMENT BOTH LINES OUT)
+        F2 IS CAPABLE OF TAKING ANY NUMBER OF PARAMETERS
+        F3 IS A POLYNOM OF 5TH GRADE THAT TAKES ONLY ONE PARAMETER"""
+        plot_function_response(f2, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
+        #plot_function_response(f3, numerical_parameters, enum_parameters=enum_parameters, bo=bo, concrete_samples=concrete_samples, x_sel=candidates)
 
         # re‐fit
         concrete_samples.extend(new_samples)
         bo.fit(bo.X_train + candidates, bo.y_train + loop_labels)
         loop_num += 1
 
-    """TO PLOT A FUNCTION CHOOSE FROM FOLLOWING PRINTS (OR COMMENT BOTH LINES OUT)"""
-    #plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
-    plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    """TO PLOT CHOOSE FROM FOLLOWING PRINTS ONE OF THE AVAILABLE MOCK FUNCTIONS
+        (OR COMMENT BOTH LINES OUT )
+        F2 IS CAPABLE OF TAKING ANY NUMBER OF PARAMETERS
+        F3 IS A POLYNOM OF 5TH GRADE THAT TAKES ONLY ONE PARAMETER"""
+    plot_function_response(f2, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
+    #plot_function_response(f3, numerical_parameters, enum_parameters, bo, concrete_samples, last_candidates)
 
 
 if __name__ == "__main__":
